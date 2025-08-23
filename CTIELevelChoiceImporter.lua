@@ -3,7 +3,6 @@
 --- back to valid Codex game object GUIDs, then applies these selections to the destination character's
 --- level choice system for proper game functionality.
 --- @class CTIELevelChoiceImporter
---- @field sourceCharacter table The source character data from the exported JSON file
 --- @field destinationCharacter table The destination character object in the Codex system
 CTIELevelChoiceImporter = RegisterGameType("CTIELevelChoiceImporter")
 CTIELevelChoiceImporter.__index = CTIELevelChoiceImporter
@@ -13,12 +12,10 @@ local writeLog = CTIEUtils.writeLog
 local STATUS = CTIEUtils.STATUS
 
 --- Creates a new CTIELevelChoiceImporter instance for importing feature choice data.
---- @param sourceCharacter table The source character data from the exported JSON file
 --- @param destinationCharacter table The destination character object in the Codex system
 --- @return CTIELevelChoiceImporter instance The new importer instance
-function CTIELevelChoiceImporter:new(sourceCharacter, destinationCharacter)
+function CTIELevelChoiceImporter:new(destinationCharacter)
     local instance = setmetatable({}, self)
-    instance.sourceCharacter = sourceCharacter
     instance.destinationCharacter = destinationCharacter
     return instance
 end

@@ -2,7 +2,7 @@
 --- This class processes background information, inciting incidents, and associated level choices,
 --- translating them back into the Codex game system format during character import operations.
 --- @class CTIECareerImporter
---- @field sourceCharacter table The source character data from the exported JSON file
+--- @field characterData CTIECharacterData The character data DTO containing career information
 --- @field destinationCharacter table The destination character object in the Codex system
 CTIECareerImporter = RegisterGameType("CTIECareerImporter")
 CTIECareerImporter.__index = CTIECareerImporter
@@ -12,12 +12,12 @@ local writeLog = CTIEUtils.writeLog
 local STATUS = CTIEUtils.STATUS
 
 --- Creates a new CTIECareerImporter instance for importing career data.
---- @param sourceCharacter table The source character data from the exported JSON file
+--- @param characterData table The source character data from the exported JSON file
 --- @param destinationCharacter table The destination character object in the Codex system
 --- @return CTIECareerImporter instance The new importer instance
-function CTIECareerImporter:new(sourceCharacter, destinationCharacter)
+function CTIECareerImporter:new(characterData, destinationCharacter)
     local instance = setmetatable({}, self)
-    instance.sourceCharacter = sourceCharacter
+    instance.characterData = characterData
     instance.destinationCharacter = destinationCharacter
     return instance
 end
@@ -29,16 +29,17 @@ function CTIECareerImporter:Import()
     writeDebug("IMPORTCAREER::")
     writeLog("Career starting.", STATUS.INFO, 1)
 
-    if self.sourceCharacter.career and self.sourceCharacter.career.backgroundid then
-        local backgroundGuid = self:_importBackground(self.sourceCharacter.career.backgroundid)
+    local career = self.characterData:GetCareer()
+    if career and career.backgroundid then
+        local backgroundGuid = self:_importBackground(career.backgroundid)
 
-        if self.sourceCharacter.career.incitingIncident and backgroundGuid then
-            self:_importIncitingIncident(self.sourceCharacter.career, backgroundGuid)
+        if career.incitingIncident and backgroundGuid then
+            self:_importIncitingIncident(career, backgroundGuid)
         end
 
-        if self.sourceCharacter.career.features then
-            local lcImporter = CTIELevelChoiceImporter:new(self.sourceCharacter, self.destinationCharacter)
-            lcImporter:Import(self.sourceCharacter.career.features)
+        if career.features then
+            local lcImporter = CTIELevelChoiceImporter:new(self.destinationCharacter)
+            lcImporter:Import(career.features)
         end
     end
 

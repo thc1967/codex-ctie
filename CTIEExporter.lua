@@ -19,10 +19,19 @@ function CTIEExporter:new(token)
     if not token or not token.properties or not token.properties:IsHero() then
         return nil
     end
-
     local instance = setmetatable({}, self)
     instance.sourceToken = token
     return instance
+end
+
+--- Provides convenient aliases for source and destination character data objects.
+--- Returns references to the source token properties and destination character data
+--- to simplify data access patterns throughout the export process.
+--- @private
+--- @return table sourceCharacter The source token's properties object
+--- @return CTIECharacterData characterData The character data DTO for encapsulated access
+function CTIEExporter:__getSourceDestCharacterAliases()
+    return self.sourceToken.properties, self.characterData
 end
 
 --- Exports all character data to a CTIECharacterData object suitable for JSON serialization.
@@ -35,7 +44,9 @@ function CTIEExporter:Export()
     self:_exportToken()
     self:_exportCharacter()
 
-    if CTIEUtils:inDebugMode() then self.characterData.token.name = "zzz" .. self.characterData.token.name end
+    if CTIEUtils:inDebugMode() then 
+        self.characterData:SetCharacterName("zzz" .. self.characterData:GetCharacterName())
+    end
 
     return self.characterData
 end
@@ -46,15 +57,10 @@ end
 --- @private
 function CTIEExporter:_exportToken()
     local st = self.sourceToken
-    local dt = self.characterData.token
 
     for propName, config in pairs(CTIEConfig.token.verbatim) do
         if config.export then
-            if type(st[propName]) == "table" then
-                dt[propName] = DeepCopy(st[propName])
-            else
-                dt[propName] = st[propName]
-            end
+            self.characterData:SetTokenProperty(propName, st[propName])
         end
     end
 end
@@ -65,23 +71,19 @@ end
 --- @private
 function CTIEExporter:_exportCharacter()
 
-    local sc, dc = self:_getSourceDestCharacterAliases()
+    local sc, dc = self:__getSourceDestCharacterAliases()
 
     -- Verbatim transfers
     for propName, config in pairs(CTIEConfig.character.verbatim) do
         if config.export then
-            if type(sc[propName]) == "table" then
-                dc[propName] = DeepCopy(sc[propName])
-            else
-                dc[propName] = sc[propName]
-            end
+            dc:SetCharacterProperty(propName, sc[propName])
         end
     end
 
-    -- Lookup Table Keys
+    -- Lookup Table Keys  
     for propName, tableName in pairs(CTIEConfig.character.lookupRecords) do
         if sc[propName] and stringIsGuid(sc[propName]) then
-            dc[propName] = CTIEUtils.MakeLookupRecord(tableName, sc[propName])
+            dc:SetLookupRecord(propName, CTIEUtils.MakeLookupRecord(tableName, sc[propName]))
         end
     end
 
@@ -99,7 +101,7 @@ end
 --- @private
 function CTIEExporter:_exportAncestry()
     writeDebug("EXPORTANCESTRY::")
-    local sc, dc = self:_getSourceDestCharacterAliases()
+    local sc, dc = self:__getSourceDestCharacterAliases()
     local a = {
         features = {},
     }
@@ -108,11 +110,10 @@ function CTIEExporter:_exportAncestry()
     if r then
         writeDebug("EXPORTANCESTRY:: RACE:: %s, %s, %s", r, sc:RaceID(), json(r))
         a.raceid = CTIEUtils.CreateLookupRecord(Race.tableName, r.id, r.name)
-
         a.features = self:_exportFeatures(r.modifierInfo.features)
     end
 
-    dc.ancestry = a
+    dc:SetAncestry(a)
     writeDebug("EXPORTANCESTRY:: %s", json(a))
 end
 
@@ -121,16 +122,7 @@ end
 --- as defined in CTIEConfig.attributes, preserving original attribute structure.
 --- @private
 function CTIEExporter:_exportAttributes()
-    local sa = self.sourceToken.properties.attributes
-    local da = {}
-
-    for _, attr in ipairs(CTIEConfig.attributes) do
-        da[attr] = {}
-        da[attr].baseValue = sa[attr].baseValue
-        da[attr].id = sa[attr].id
-    end
-
-    self.characterData.token.character.attributes = da
+    self.characterData:SetAttributes(self.sourceToken.properties.attributes)
 end
 
 --- Exports character career and background information.
@@ -139,7 +131,7 @@ end
 --- @private
 function CTIEExporter:_exportCareer()
     writeDebug("EXPORTCAREER::")
-    local sc, dc = self:_getSourceDestCharacterAliases()
+    local sc, dc = self:__getSourceDestCharacterAliases()
     local b = {}
 
     local bg = sc:Background()
@@ -159,7 +151,7 @@ function CTIEExporter:_exportCareer()
         b.features = self:_exportFeatures(bg.modifierInfo.features)
     end
 
-    dc.career = b
+    dc:SetCareer(b)
     writeDebug("EXPORTCAREER:: %s", json(b))
 end
 
@@ -170,12 +162,12 @@ end
 function CTIEExporter:_exportClasses()
     writeDebug("EXPORTCLASSES::")
 
-    local sc, dc = self:_getSourceDestCharacterAliases()
+    local sc, dc = self:__getSourceDestCharacterAliases()
 
-    dc.classes = {}
+    local classes = {}
 
     local sourceClasses = sc.classes or {}
-    for key, class in pairs(sourceClasses) do
+    for _, class in pairs(sourceClasses) do
         -- Skip the _luaTable marker
         if type(class) == "table" then
             local classData = {}
@@ -212,11 +204,12 @@ function CTIEExporter:_exportClasses()
                 end
             end
 
-            table.insert(dc.classes, classData)
+            table.insert(classes, classData)
         end
     end
 
-    writeDebug("EXPORTCLASSES:: %s", json(dc.classes))
+    dc:SetClasses(classes)
+    writeDebug("EXPORTCLASSES:: %s", json(dc:GetClasses()))
 end
 
 --- Exports character culture information including aspects and language choices.
@@ -225,7 +218,7 @@ end
 --- @private
 function CTIEExporter:_exportCulture()
 
-    local sc, dc = self:_getSourceDestCharacterAliases()
+    local sc, dc = self:__getSourceDestCharacterAliases()
     local culture = {
         aspects = {},
     }
@@ -257,9 +250,9 @@ function CTIEExporter:_exportCulture()
         exportCultureAspect("upbringing")
     end
 
-    dc.culture = culture
+    dc:SetCulture(culture)
 
-    writeDebug("EXPORTCULTURE:: END:: %s", json(dc.culture))
+    writeDebug("EXPORTCULTURE:: END:: %s", json(dc:GetCulture()))
 end
 
 --- Recursively exports feature data and choice selections across all feature types.
@@ -271,7 +264,7 @@ end
 function CTIEExporter:_exportFeatures(featureList)
     writeDebug("EXPORTFEATURES:: START:: %s", json(featureList))
 
-    local sc, _ = self:_getSourceDestCharacterAliases()
+    local sc, _ = self:__getSourceDestCharacterAliases()
     local features = {}
 
     for _, feature in pairs(featureList) do
@@ -343,14 +336,4 @@ function CTIEExporter:_addDeityDomains(featureGuid, sourceCharacter, features)  
             features[domainGuid] = domainSelections  -- Add as separate feature
         end
     end
-end
-
---- Provides convenient aliases for source and destination character data objects.
---- Returns references to the source token properties and destination character data
---- to simplify data access patterns throughout the export process.
---- @private
---- @return table sourceCharacter The source token's properties object
---- @return table destinationCharacter The destination character data object
-function CTIEExporter:_getSourceDestCharacterAliases()
-    return self.sourceToken.properties, self.characterData.token.character
 end

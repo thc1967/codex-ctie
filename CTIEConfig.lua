@@ -8,7 +8,7 @@ CTIEConfig.__index = CTIEConfig
 --- Standard character attribute names used throughout the CTIE system.
 --- Defines the canonical order and naming for character attributes in import/export operations.
 --- @type string[] Array of attribute identifiers: might, agility, intuition, presence, reason
-CTIEConfig.attributes = { "mgt", "agl", "inu", "prs", "rea" }
+CTIEConfig.attributes = { "mgt", "agl", "rea", "inu", "prs" }
 
 --- Configuration settings for token-level data processing.
 --- @type table Container for all token-related configuration options
