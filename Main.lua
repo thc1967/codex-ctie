@@ -77,7 +77,7 @@ end
 
 import.Register {
     id = "ctiecharacter",
-    description = "Character from Codex Export",
+    description = "CTIE: Character Import",
     input = "plaintext",
     priority = 1200,
     text = function(importer, text)

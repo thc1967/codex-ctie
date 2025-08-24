@@ -18,8 +18,8 @@
 CTIEUtils = RegisterGameType("CTIEUtils")
 CTIEUtils.__index = CTIEUtils
 
-local CTIE_DEBUG = false
-local CTIE_VERBOSE = false
+local CTIE_DEBUG = true
+local CTIE_VERBOSE = true
 
 --- Sets the debug mode state.
 --- @param v boolean The debug mode state to set
@@ -337,5 +337,21 @@ function CTIEUtils.MergeTables(target, source)
     for key, value in pairs(source) do
         target[key] = value
     end
+    return target
+end
+
+--- Appends all elements from the source list to the target list.
+--- Modifies the target list in place by adding all source elements at the end,
+--- preserving the original order of both lists. Works with numeric-indexed arrays only.
+--- @param target table The target list to append elements to (modified in place)
+--- @param source table The source list containing elements to append (unchanged)
+--- @return table target The modified target list containing original plus appended elements
+function CTIEUtils.AppendList(target, source)
+    if not target or not source then
+        return target or {}
+    end
+
+    table.move(source, 1, #source, #target + 1, target)
+
     return target
 end

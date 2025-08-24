@@ -144,14 +144,19 @@ function CTIEImporter:_importCharacter()
 
     local sc, dc = self:__getSourceDestCharacterAliases()
 
--- Verbatim copies
+    -- Verbatim copies
     writeLog("Verbatim property import starting.", STATUS.INFO, 1)
     for propName, config in pairs(CTIEConfig.character.verbatim) do
         if config.import then
             if sc:HasCharacterProperty(propName) then
                 writeDebug("IMPORTCHARACTER:: %s", propName)
                 writeLog(string.format("Adding property [%s].", propName), STATUS.IMPL)
-                dc:get_or_add(propName, sc:GetCharacterProperty(propName))
+                local v = dc:get_or_add(propName, {})
+                if config.keyed then
+                    v = CTIEUtils.MergeTables(v, sc:GetCharacterProperty(propName))
+                else
+                    v = CTIEUtils.AppendList(v, sc:GetCharacterProperty(propName))
+                end
             end
         end
     end

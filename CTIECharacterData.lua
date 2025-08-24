@@ -41,6 +41,14 @@ function CTIECharacterData:_getToken()
     return self.data.token
 end
 
+--- Internal helper to retrieve the character structure.
+--- Always returns the character reference from the internal data structure.
+--- @private
+--- @return table character The character structure containing character data
+function CTIECharacterData:_getCharacter()
+    return self:_getToken().character
+end
+
 --- Internal helper to retrieve the metadata structure.
 --- Always returns the metadata reference from the internal data structure.
 --- @private
@@ -54,8 +62,9 @@ end
 --- for UI display and file operations.
 --- @return string name The character's name, or "Unnamed" if no valid name is present
 function CTIECharacterData:GetCharacterName()
-    if self:_getToken().name and #self:_getToken().name > 0 then
-        return self:_getToken().name
+    local t = self:_getToken()
+    if t.name and #t.name > 0 then
+        return t.name
     else
         return "Unnamed"
     end
@@ -72,14 +81,14 @@ function CTIECharacterData:SetCharacterName(name)
     else
         finalName = "Unnamed"
     end
-    
+
     self:_getToken().name = finalName
-    
+
     -- Update metadata if available
     if self:_getMetadata() then
         self:_getMetadata().characterName = finalName
     end
-    
+
     return self
 end
 
@@ -112,7 +121,7 @@ end
 --- @param lookupRecord table The lookup record with tableName, guid, and name fields
 --- @return CTIECharacterData self Returns this instance to support method chaining
 function CTIECharacterData:SetLookupRecord(propertyName, lookupRecord)
-    self:_getToken().character[propertyName] = lookupRecord
+    self:_getCharacter()[propertyName] = lookupRecord
     return self
 end
 
@@ -120,14 +129,14 @@ end
 --- @param propertyName string The character property name to retrieve
 --- @return table|nil lookupRecord The lookup record with tableName, guid, and name, or nil if not set
 function CTIECharacterData:GetLookupRecord(propertyName)
-    return self:_getToken().character[propertyName]
+    return self:_getCharacter()[propertyName]
 end
 
 --- Checks if a lookup record has been set for the specified character property.
 --- @param propertyName string The character property name to check
 --- @return boolean hasRecord True if the property has a lookup record, false otherwise
 function CTIECharacterData:HasLookupRecord(propertyName)
-    return self:_getToken().character[propertyName] ~= nil
+    return self:_getCharacter()[propertyName] ~= nil
 end
 
 --- Sets a token property with automatic deep copying for table values.
@@ -165,9 +174,9 @@ end
 --- @return CTIECharacterData self Returns this instance to support method chaining
 function CTIECharacterData:SetCharacterProperty(propertyName, value)
     if type(value) == "table" then
-        self:_getToken().character[propertyName] = DeepCopy(value)
+        self:_getCharacter()[propertyName] = DeepCopy(value)
     else
-        self:_getToken().character[propertyName] = value
+        self:_getCharacter()[propertyName] = value
     end
     return self
 end
@@ -176,14 +185,14 @@ end
 --- @param propertyName string The character property name to retrieve
 --- @return any value The character property value, or nil if not set
 function CTIECharacterData:GetCharacterProperty(propertyName)
-    return self:_getToken().character[propertyName]
+    return self:_getCharacter()[propertyName]
 end
 
 --- Checks if a character property has been set.
 --- @param propertyName string The character property name to check
 --- @return boolean hasProperty True if the property exists, false otherwise
 function CTIECharacterData:HasCharacterProperty(propertyName)
-    return self:_getToken().character[propertyName] ~= nil
+    return self:_getCharacter()[propertyName] ~= nil
 end
 
 --- Sets the character attributes from source attribute data.
@@ -200,14 +209,14 @@ function CTIECharacterData:SetAttributes(sourceAttributes)
             }
         end
     end
-    self:_getToken().character.attributes = attributes
+    self:_getCharacter().attributes = attributes
     return self
 end
 
 --- Retrieves the character attributes data.
 --- @return table attributes The attributes table with baseValue and id for each attribute
 function CTIECharacterData:GetAttributes()
-    return self:_getToken().character.attributes or {}
+    return self:_getCharacter().attributes or {}
 end
 
 --- Generates a formatted summary string of attribute values for logging.
@@ -256,56 +265,70 @@ end
 --- @param ancestry table The ancestry data with raceid and features
 --- @return CTIECharacterData self Returns this instance to support method chaining  
 function CTIECharacterData:SetAncestry(ancestry)
-    self:_getToken().character.ancestry = ancestry
+    self:_getCharacter().ancestry = ancestry
     return self
 end
 
 --- Gets the character ancestry data.
 --- @return table|nil ancestry The ancestry data, or nil if not set
 function CTIECharacterData:GetAncestry()
-    return self:_getToken().character.ancestry
+    return self:_getCharacter().ancestry
 end
 
 --- Sets the character career data including background and features.
 --- @param career table The career data with backgroundid, incitingIncident, and features
 --- @return CTIECharacterData self Returns this instance to support method chaining
 function CTIECharacterData:SetCareer(career)
-    self:_getToken().character.career = career
+    self:_getCharacter().career = career
     return self
 end
 
 --- Gets the character career data.
 --- @return table|nil career The career data, or nil if not set
 function CTIECharacterData:GetCareer()
-    return self:_getToken().character.career
+    return self:_getCharacter().career
+end
+
+--- Sets the character features data including background and features.
+--- @param features table The features data
+--- @return CTIECharacterData self Returns this instance to support method chaining
+function CTIECharacterData:SetCharacterFeatures(features)
+    self:_getCharacter().characterFeatures = features
+    return self
+end
+
+--- Gets the character features data.
+--- @return table|nil features The features data, or nil if not set
+function CTIECharacterData:GetCharacterFeatures()
+    return self:_getCharacter().characterFeatures
 end
 
 --- Sets the character culture data including aspects and features.
 --- @param culture table The culture data with aspects and features
 --- @return CTIECharacterData self Returns this instance to support method chaining
 function CTIECharacterData:SetCulture(culture)
-    self:_getToken().character.culture = culture
+    self:_getCharacter().culture = culture
     return self
 end
 
 --- Gets the character culture data.
 --- @return table|nil culture The culture data, or nil if not set
 function CTIECharacterData:GetCulture()
-    return self:_getToken().character.culture
+    return self:_getCharacter().culture
 end
 
 --- Sets the character classes data including levels and features.
 --- @param classes table The classes array with class information and features
 --- @return CTIECharacterData self Returns this instance to support method chaining
 function CTIECharacterData:SetClasses(classes)
-    self:_getToken().character.classes = classes
+    self:_getCharacter().classes = classes
     return self
 end
 
 --- Gets the character classes data.
 --- @return table|nil classes The classes array, or nil if not set
 function CTIECharacterData:GetClasses()
-    return self:_getToken().character.classes
+    return self:_getCharacter().classes
 end
 
 --- Converts the character data to JSON format for export operations.

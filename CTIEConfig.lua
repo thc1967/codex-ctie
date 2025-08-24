@@ -47,9 +47,12 @@ CTIEConfig.character = {}
 
 --- Defines which character properties should be copied verbatim during export and import operations.
 --- Similar to token.verbatim but applies to character-specific properties rather than token properties.
---- @type table<string, {export: boolean, import: boolean}> Map of character property names to export/import flags
+--- @type table<string, {keyed: boolean, export: boolean, import: boolean}> Map of character property names to export/import flags
 CTIEConfig.character.verbatim = {
-    attributeBuild = { export = true, import = false },
+    attributeBuild = { keyed = true, export = true, import = false },
+    characterFeatures = { keyed = false, export = true, import = true },
+    innateActivatedAbilities = { keyed = false, export = true, import = true },
+    resistances = { keyed = false, export = true, import = true },
 }
 
 --- Maps character property names to their corresponding Codex database table names for GUID resolution.
