@@ -24,15 +24,17 @@ end
 --- character data extraction, file generation, and user feedback via chat messages.
 --- Validates the selected token, creates an exporter instance, generates the export filename
 --- with timestamp (or simplified name in debug mode), and provides status updates to the user.
+--- @param token? Token Optional token to export (defaults to dmhub.currentToken)
 --- @return nil This function has no return value; results are communicated via chat messages
-function CTIEExport()
+function CTIEExport(token)
+    local targetToken = token or dmhub.currentToken
 
-    if not dmhub.currentToken then
+    if not targetToken then
         statusToChat("No token selected.", STATUS.WARN)
         return
     end
 
-    local exporter = CTIEExporter:new(dmhub.currentToken)
+    local exporter = CTIEExporter:new(targetToken)
     if not exporter then
         statusToChat("Selected token is not a hero.", STATUS.WARN)
         return
