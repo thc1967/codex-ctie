@@ -25,15 +25,14 @@ local writeLog = CTIEUtils.writeLog
 local stringIsGuid = CTIEUtils.StringIsGuid
 local STATUS = CTIEUtils.STATUS
 
---- Creates a new CTIEImporter instance and initializes character data from JSON text.
---- Parses the provided JSON string into a CTIECharacterData object for subsequent import operations.
---- @param jsonText string The JSON string containing exported character data
---- @return CTIEImporter instance The new importer instance with parsed character data
-function CTIEImporter:new(jsonText)
+--- Creates a new CTIEImporter instance with pre-populated character data.
+--- Takes a populated CTIECharacterData object for import operations, eliminating the JSON parsing
+--- responsibility from the importer and allowing for programmatic character data construction.
+--- @param characterData CTIECharacterData The populated character data object for import
+--- @return CTIEImporter instance The new importer instance with character data
+function CTIEImporter:new(characterData)
     local instance = setmetatable({}, self)
-    instance.characterData = CTIECharacterData:new()
-    instance.characterData:FromJSON(jsonText)
-
+    instance.characterData = characterData
     return instance
 end
 
@@ -173,7 +172,8 @@ function CTIEImporter:_importCharacter()
     writeLog("Simple Lookup import starting.", STATUS.INFO, 1)
     for propName, tableName in pairs(CTIEConfig.character.lookupRecords) do
         if sc:HasLookupRecord(propName) then
-            local guid = CTIEUtils.ResolveLookupRecord(tableName, sc:GetLookupRecord(propName))
+            local r = sc:GetLookupRecord(propName)
+            local guid = CTIEUtils.ResolveLookupRecord(tableName, r.name, r.guid)
             if guid then
                 writeLog(string.format("Adding [%s].", propName), STATUS.IMPL)
                 local v = dc:get_or_add(propName, guid)
@@ -199,21 +199,25 @@ function CTIEImporter:_importAncestry()
 
     local ancestry = sc:GetAncestry()
     if ancestry and ancestry.raceid then
-        local guid = CTIEUtils.ResolveLookupRecord(Race.tableName, ancestry.raceid)
+        local guid = CTIEUtils.ResolveLookupRecord(Race.tableName, ancestry.raceid.name, ancestry.raceid.guid)
         if guid then
             writeLog(string.format("Adding ancestry %s.", ancestry.raceid.name), STATUS.IMPL)
             local r = dc:get_or_add("raceid", guid)
             r = guid
 
+            local lcImporter = CTIELevelChoiceImporter:new(dc)
+            local raceFill = dc:Race():GetClassLevel().features
             if ancestry.features then
-                local lcImporter = CTIELevelChoiceImporter:new(dc)
-                lcImporter:Import(ancestry.features, dc:Race():GetClassLevel().features)
+                lcImporter:Import(ancestry.features, raceFill)
+            end
+            if ancestry.unkeyedFeatures then
+                lcImporter:ImportUnkeyed(ancestry.unkeyedFeatures, raceFill)
             end
         end
     end
 
     writeLog("Ancestry complete.", STATUS.INFO, -1)
-    writeDebug("IMPORTANCESTRY:: COMPLETE:: %s", dc.raceid)
+    writeDebug("IMPORTANCESTRY:: COMPLETE:: %s", dc:try_get("raceid"))
 end
 
 --- Imports character attribute build configuration data.
@@ -274,7 +278,7 @@ function CTIEImporter:_importClasses()
 
     if sourceClasses then
         for _, classInfo in ipairs(sourceClasses) do
-            local classGuid = CTIEUtils.ResolveLookupRecord(Class.tableName, classInfo.classid)
+            local classGuid = CTIEUtils.ResolveLookupRecord(Class.tableName, classInfo.classid.name, classInfo.classid.guid)
             if classGuid and #classGuid then
                 writeDebug("IMPORTCLASSES:: ADD:: %s %s %d", classGuid, classInfo.classid.name or "nil", classInfo.level or 1)
                 writeLog(string.format("Adding Class [%s]", classInfo.classid.name), STATUS.IMPL)
@@ -291,7 +295,7 @@ function CTIEImporter:_importClasses()
     end
 
     writeLog("Class complete.", STATUS.INFO, -1)
-    writeDebug("IMPORTCLASSES:: %s", json(dc.classes))
+    writeDebug("IMPORTCLASSES:: COMPLETE:: %s", json(dc:try_get("classes")))
 end
 
 --- Imports character culture information including aspects and culture-based features.
@@ -315,14 +319,18 @@ function CTIEImporter:_importCulture()
     if culture and culture.aspects then
         for aspectName, aspect in pairs(culture.aspects) do
             writeDebug("IMPORTCULTURE:: ASPECT:: %s %s", aspectName, json(aspect))
-            local aspectGuid = CTIEUtils.ResolveLookupRecord(CultureAspect.tableName, aspect)
+            local aspectGuid = CTIEUtils.ResolveLookupRecord(CultureAspect.tableName, aspect.name, aspect.guid)
             if aspectGuid and #aspectGuid then
                 writeLog(string.format("Adding Culture Aspect [%s]->[%s].", aspectName, aspect.name), STATUS.IMPL)
                 aspects[aspectName] = aspectGuid
 
+                local lcImporter = CTIELevelChoiceImporter:new(dc)
                 if aspect.features then
-                    local lcImporter = CTIELevelChoiceImporter:new(dc)
                     lcImporter:Import(aspect.features)
+                end
+                if aspect.unkeyedFeatures then
+                    local aspectFill = dmhub.GetTable(CultureAspect.tableName)[aspectGuid]:GetClassLevel()
+                    lcImporter:ImportUnkeyed(aspect.unkeyedFeatures, aspectFill.features)
                 end
             end
         end

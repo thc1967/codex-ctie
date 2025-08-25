@@ -27,7 +27,20 @@ function CTIECharacterData:new()
             characterName = "Unnamed"
         },
         token = {
-            character = {},
+            character = {
+                -- ancestry = {},
+                -- attributeBuild = {},
+                -- attributes = {},
+                -- career = {},
+                -- characterFeatures = {},
+                -- chartypeid = {},
+                -- classes = {},
+                -- complicationid = {},
+                -- culture = {},
+                -- innateActivatedAbilities = {},
+                -- kitid = {},
+                -- resistances = {},
+            },
         }
     }
     return instance
@@ -195,6 +208,44 @@ function CTIECharacterData:HasCharacterProperty(propertyName)
     return self:_getCharacter()[propertyName] ~= nil
 end
 
+--- Sets an individual character attribute value using builder pattern.
+--- Validates the attribute key against expected values and sets the baseValue and id
+--- for the specified attribute. Creates the attributes structure if it doesn't exist.
+--- @param attributeKey string The attribute key (must be in CTIEConfig.attributes)
+--- @param baseValue number The base value for the attribute
+--- @return CTIECharacterData self Returns this instance to support method chaining
+function CTIECharacterData:SetAttributeValue(attributeKey, baseValue)
+    -- Validate attribute key
+    local validKey = false
+    for _, validAttr in ipairs(CTIEConfig.attributes) do
+        if validAttr == attributeKey then
+            validKey = true
+            break
+        end
+    end
+
+    if not validKey then
+        writeLog(string.format("!!!! Invalid attribute key '%s'. Must be one of: %s", 
+            attributeKey, table.concat(CTIEConfig.attributes, ", ")), CTIEUtils.STATUS.ERROR)
+        return self
+    end
+
+    -- Get or create attributes table
+    local attributes = self:_getCharacter().attributes or {}
+    self:_getCharacter().attributes = attributes
+
+    -- Ensure attribute structure exists
+    if not attributes[attributeKey] then
+        attributes[attributeKey] = {}
+    end
+
+    -- Set the values
+    attributes[attributeKey].baseValue = baseValue
+    attributes[attributeKey].id = attributeKey
+
+    return self
+end
+
 --- Sets the character attributes from source attribute data.
 --- Extracts baseValue and id for each configured attribute and stores in the DTO format.
 --- @param sourceAttributes table The source attributes object containing full attribute data
@@ -269,6 +320,52 @@ function CTIECharacterData:SetAncestry(ancestry)
     return self
 end
 
+--- Sets the ancestry race name using lookup record format.
+--- Creates the ancestry structure if needed and sets the raceid as a lookup record
+--- with the provided name, Race.tableName, and empty GUID for later resolution.
+--- @param raceName string The name of the race/ancestry
+--- @return CTIECharacterData self Returns this instance to support method chaining
+function CTIECharacterData:SetAncestryRace(raceName)
+    if not raceName or #raceName == 0 then
+        writeDebug("!!!! Empty race name provided to SetAncestryRace.")
+        return self
+    end
+
+    local ancestry = self:GetAncestry() or {}
+    ancestry.raceid = CTIEUtils.CreateLookupRecord(Race.tableName, "", raceName)
+    self:SetAncestry(ancestry)
+    return self
+end
+
+--- Adds an unkeyed feature to the ancestry's unkeyed features list.
+--- Creates the ancestry and unkeyedFeatures structures if they don't exist.
+--- @param feature table The lookup record with tableName, guid, and name
+--- @return CTIECharacterData self Returns this instance to support method chaining
+function CTIECharacterData:AddUnkeyedAncestryFeature(feature)
+    writeDebug("ADDUNKEYEDANCESTRYFEATURE:: START:: %s", json(feature))
+    if not feature then
+        writeDebug("ADDUNKEYEDANCESTRYFEATURE:: INVALID::")
+        return self
+    end
+
+    -- Get or create ancestry structure
+    local ancestry = self:GetAncestry() or {}
+
+    -- Get or create unkeyedFeatures array
+    if not ancestry.unkeyedFeatures then
+        ancestry.unkeyedFeatures = {}
+    end
+
+    -- Append the feature
+    table.insert(ancestry.unkeyedFeatures, feature)
+
+    -- Store back to character data
+    self:SetAncestry(ancestry)
+
+    writeDebug("ADDUNKEYEDANCESTRYFEATURE:: COMPLETE:: %s", json(self:GetAncestry()))
+    return self
+end
+
 --- Gets the character ancestry data.
 --- @return table|nil ancestry The ancestry data, or nil if not set
 function CTIECharacterData:GetAncestry()
@@ -280,6 +377,18 @@ end
 --- @return CTIECharacterData self Returns this instance to support method chaining
 function CTIECharacterData:SetCareer(career)
     self:_getCharacter().career = career
+    return self
+end
+
+function CTIECharacterData:SetCareerBackground(backgroundName)
+    if not backgroundName or #backgroundName == 0 then
+        writeDebug("!!!! Empty race name provided to SetCareerBackground.")
+        return self
+    end
+
+    local career = self:GetCareer() or {}
+    career.backgroundid = CTIEUtils.CreateLookupRecord(Background.tableName, "", backgroundName)
+    self:SetCareer(career)
     return self
 end
 
@@ -309,6 +418,38 @@ end
 function CTIECharacterData:SetCulture(culture)
     self:_getCharacter().culture = culture
     return self
+end
+
+function CTIECharacterData:SetCultureAspect(aspectName, guid, name)
+    local culture = self:GetCulture() or {}
+    local aspects = culture.aspects or {}
+    local aspect = aspects[aspectName] or {}
+    aspect.guid = guid or ""
+    aspect.name = name or ""
+    aspect.tableName = CultureAspect.tableName
+    aspects[aspectName] = aspect
+    culture.aspects = aspects
+    return self:SetCulture(culture)
+end
+
+function CTIECharacterData:AddKeyedCultureFeature(key, feature)
+    local culture = self:GetCulture() or {}
+    local features = culture.features or {}
+    features[key] = feature
+    culture.features = features
+    return self:SetCulture(culture)
+end
+
+function CTIECharacterData:AddCultureAspectUnkeyedFeature(aspectName, feature)
+    local culture = self:GetCulture() or {}
+    local aspects = culture.aspects or {}
+    local aspect = aspects[aspectName] or {}
+    local unkeyedFeatures = aspect.unkeyedFeatures or {}
+    table.insert(unkeyedFeatures, feature)
+    aspect.unkeyedFeatures = unkeyedFeatures
+    aspects[aspectName] = aspect
+    culture.aspects = aspects
+    return self:SetCulture(culture)
 end
 
 --- Gets the character culture data.
@@ -344,17 +485,17 @@ end
 --- legacy format to current internal structure. Always maintains internal data structure regardless
 --- of input format. Handles parsing errors gracefully and returns nil on failure.
 --- @param jsonText string The JSON string containing character data to import
---- @return table|nil data The parsed data structure if successful, nil if parsing failed or input was invalid
+--- @return CTIECharacterData|nil self Returns this instance for method chaining on success, nil on failure
 function CTIECharacterData:FromJSON(jsonText)
     writeDebug("CTIECharacterData.FromJSON():: %d\n%s", jsonText and #jsonText or 0, jsonText)
     if not jsonText then
-        writeLog("!!!! Empty import file.", CTIEUtils.STATUS.WARN)
+        writeDebug("!!!! Empty import file.")
         return nil
     end
 
     local parsedData = dmhub.FromJson(jsonText).result
     if not parsedData then
-        writeLog("!!!! Invalid JSON file format.", CTIEUtils.STATUS.WARN)
+        writeDebug("!!!! Invalid JSON file format.")
         return nil
     end
 
@@ -377,5 +518,5 @@ function CTIECharacterData:FromJSON(jsonText)
     end
 
     writeDebug("CTIECharacterData.FromJSON():: FINAL DATA::\n%s", json(self.data))
-    return self.data
+    return self
 end

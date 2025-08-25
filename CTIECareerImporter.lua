@@ -52,7 +52,7 @@ end
 --- @param backgroundData table The background lookup record containing tableName, guid, and name
 --- @return string|nil guid The resolved background GUID if successful, nil if failed
 function CTIECareerImporter:_importBackground(backgroundData)
-    local guid = CTIEUtils.ResolveLookupRecord(Background.tableName, backgroundData)
+    local guid = CTIEUtils.ResolveLookupRecord(Background.tableName, backgroundData.name, backgroundData.guid)
     if guid then
         writeLog(string.format("Adding Career [%s]", backgroundData.name), STATUS.IMPL)
         self.destinationCharacter:get_or_add("backgroundid", guid)

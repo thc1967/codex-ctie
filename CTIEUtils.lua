@@ -21,6 +21,14 @@ CTIEUtils.__index = CTIEUtils
 local CTIE_DEBUG = true
 local CTIE_VERBOSE = true
 
+local TABLE_NAME_CHOICE_TYPE_MAP = {
+    [Language.tableName] = "CharacterLanguageChoice",
+    [Skill.tableName] = "CharacterSkillChoice",
+}
+
+--- Marker used in lookup records to identify features that exist in option lists rather than database tables
+CTIEUtils.FEATURE_TABLE_MARKER = "::FEATURE::"
+
 --- Sets the debug mode state.
 --- @param v boolean The debug mode state to set
 function CTIEUtils.SetDebugMode(v)
@@ -203,15 +211,15 @@ end
 
 --- Creates a feature record for features that exist in option lists rather than database tables.
 --- Searches through the provided options list to find a feature matching the given GUID
---- and creates a lookup record with the special "::FEATURE::" table name marker.
+--- and creates a lookup record with the special feature table name marker.
 --- @param optionsList table The list of available feature options to search
 --- @param guid string The GUID of the feature to create a record for
---- @return table record The feature lookup record with "::FEATURE::" as table name
+--- @return table record The feature lookup record with feature as table name
 function CTIEUtils.MakeFeatureRecord(optionsList, guid)
     CTIEUtils.writeDebug("MAKEFEATURERECORD:: GUID:: %s", guid)
 
     if not optionsList or not guid then
-        return CTIEUtils.CreateLookupRecord("::FEATURE::", guid, "")
+        return CTIEUtils.CreateLookupRecord(CTIEUtils.FEATURE_TABLE_MARKER, guid, "")
     end
 
     -- Search through the feature list for the matching guid
@@ -225,7 +233,7 @@ function CTIEUtils.MakeFeatureRecord(optionsList, guid)
     end
 
     CTIEUtils.writeDebug("MAKEFEATURERECORD:: DONE:: %s", name)
-    return CTIEUtils.CreateLookupRecord("::FEATURE::", guid, name)
+    return CTIEUtils.CreateLookupRecord(CTIEUtils.FEATURE_TABLE_MARKER, guid, name)
 end
 
 --- Resolves a feature record back to a valid feature GUID using the provided feature structure.
@@ -299,32 +307,40 @@ function CTIEUtils.MakeLookupRecord(tableName, guid)
 end
 
 --- Resolves a lookup record back to a valid GUID using table lookups and name matching.
---- First attempts direct GUID lookup in the specified table, then falls back to name-based
---- matching if the GUID is not found. Returns the original GUID if all resolution attempts fail.
---- @param tableName string The name of the Codex game table to search
---- @param lookupRecord table The lookup record containing tableName, guid, and name fields
---- @return string guid The resolved GUID, or the original GUID if resolution fails
-function CTIEUtils.ResolveLookupRecord(tableName, lookupRecord)
-    CTIEUtils.writeDebug("RESOLVELOOKUPRECORD:: %s %s", tableName, json(lookupRecord))
+--- Attempts resolution in priority order: direct GUID lookup, name-based matching, 
+--- and finally returns the provided GUID if no table-based resolution succeeds.
+--- @param tableName string|nil The name of the Codex game table to search
+--- @param name string|nil The display name to match against table entries  
+--- @param guid string|nil The GUID to lookup or return as fallback
+--- @return string|nil guid The resolved GUID, or nil if all resolution attempts fail
+function CTIEUtils.ResolveLookupRecord(tableName, name, guid)
+    CTIEUtils.writeDebug("RESOLVELOOKUPRECORD:: table[%s] name[%s] guid[%s]", tableName or "nil", name or "nil", guid or "nil")
 
-    if not lookupRecord or not lookupRecord.guid then return "" end
+    -- If we have a table name and a guid, do the lookup by key. If found, return the guid.
+    if tableName and guid then
+        local table = dmhub.GetTable(tableName)
+        if table and table[guid] then
+            return guid
+        end
+    end
 
-    if not tableName then return lookupRecord.guid end
-
-    local table = dmhub.GetTable(tableName)
-    if not table then return lookupRecord.guid end
-
-    -- First try direct GUID lookup
-    if table[lookupRecord.guid] then return lookupRecord.guid end
-
-    -- Fall back to name lookup
-    if lookupRecord.name and #lookupRecord.name > 0 then
-        local id, _ = CTIEUtils.TableLookupFromName(tableName, lookupRecord.name)
+    -- If we have a table name and a name, do the lookup via TableLookupFromName. If found, return the guid.
+    if tableName and name and #name > 0 then
+        local id, _ = CTIEUtils.TableLookupFromName(tableName, name)
         if id then return id end
     end
 
-    -- Return original GUID as fallback
-    return lookupRecord.guid
+    -- If we have a guid, return the guid.
+    if guid then return guid end
+
+    return nil
+end
+
+--- Maps table names to choice types via TABLE_NAME_CHOICE_TYPE_MAP lookup.
+--- @param tableName string The table name to map
+--- @return string The choice type or empty string if not found
+function CTIEUtils.TableNameToChoiceType(tableName)
+    return TABLE_NAME_CHOICE_TYPE_MAP[tableName] or ""
 end
 
 --- Merges all key-value pairs from source table into target table.
@@ -354,4 +370,15 @@ function CTIEUtils.AppendList(target, source)
     table.move(source, 1, #source, #target + 1, target)
 
     return target
+end
+
+--- Appends a value to a table at the specified key, creating the key's table if needed.
+--- @param t table The target table to modify
+--- @param k any The key where the value should be appended
+--- @param v any The value to append
+--- @return table The modified table
+function CTIEUtils.AppendTable(t, k, v)
+    t[k] = t[k] or {}
+    table.insert(t[k], v)
+    return t
 end

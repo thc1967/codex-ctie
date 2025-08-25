@@ -77,15 +77,17 @@ end
 
 import.Register {
     id = "ctiecharacter",
-    description = "CTIE: Character Import",
+    description = "Character from Codex Export",
     input = "plaintext",
     priority = 1200,
     text = function(importer, text)
-        importer = CTIEImporter:new(text)
-        if importer then
-            importer:Import()
+        local characterData = CTIECharacterData:new()
+
+        if characterData:FromJSON(text) then
+            local ctieImporter = CTIEImporter:new(characterData)
+            ctieImporter:Import()
         else
-            writeLog("!!!! Could not create importer!", CTIEUtils.STATUS.ERROR)
+            writeLog("!!!! Invalid import file format!", CTIEUtils.STATUS.ERROR)
         end
     end
 }

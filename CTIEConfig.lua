@@ -5,10 +5,15 @@
 CTIEConfig = RegisterGameType("CTIEConfig")
 CTIEConfig.__index = CTIEConfig
 
---- Standard character attribute names used throughout the CTIE system.
+--- Standard character attribute names.
 --- Defines the canonical order and naming for character attributes in import/export operations.
 --- @type string[] Array of attribute identifiers: might, agility, intuition, presence, reason
 CTIEConfig.attributes = { "mgt", "agl", "rea", "inu", "prs" }
+
+--- Standard culture aspect names.
+--- Defines the canonical order and naming for culture aspects in import/export operations.
+--- @type string[] Array of culture aspects: environment, organization, upbringing.
+CTIEConfig.cultureAspects = { "environment", "organization", "upbringing" }
 
 --- Configuration settings for token-level data processing.
 --- @type table Container for all token-related configuration options
@@ -46,7 +51,9 @@ CTIEConfig.token.verbatim = {
 CTIEConfig.character = {}
 
 --- Defines which character properties should be copied verbatim during export and import operations.
---- Similar to token.verbatim but applies to character-specific properties rather than token properties.
+--- Each property specifies export and import flags to control data flow direction.
+--- Properties marked as export=true will be included in exported JSON files.
+--- Properties marked as import=true will be restored when importing characters.
 --- @type table<string, {keyed: boolean, export: boolean, import: boolean}> Map of character property names to export/import flags
 CTIEConfig.character.verbatim = {
     attributeBuild = { keyed = true, export = true, import = false },
