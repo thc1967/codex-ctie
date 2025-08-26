@@ -13,18 +13,51 @@ CTIECodexDTO.__index = CTIECodexDTO
 --- @return CTIEBaseDTO|CTIECodexDTO instance The new Codex DTO instance
 function CTIECodexDTO:new()
     local instance = setmetatable(CTIEBaseDTO:new(), self)
-    instance.data = {
-        metadata = CTIEMetadataDTO:new(),
-        token = CTIETokenDTO:new(),
-        character = CTIECharacterDTO:new(),
-    }
+    instance.metadata = CTIEMetadataDTO:new()
+    instance.token = CTIETokenDTO:new()
+    instance.character = CTIECharacterDTO:new()
     return instance
+end
+
+function CTIECodexDTO:Metadata()
+    return self:_getData("medadata")
+end
+
+function CTIECodexDTO:Token()
+    return self:_getData("token")
+end
+
+function CTIECodexDTO:Character()
+    return self:_getData("character")
+end
+
+function CTIECodexDTO:GetCharacterName()
+    return self:Token():GetName()
 end
 
 --- Converts Codex DTO to JSON string for file export.
 --- @return string json The complete character data as a JSON string
-function CTIECodexDTO:ToJson()
-    return json(self:ToTable())
+function CTIECodexDTO:ToJSON()
+    return json(self:_toTable())
+end
+
+--- Converts JSON string to DTO instance using embedded type names.
+--- @param jsonText string The JSON data to deserialize
+--- @return CTIECodexDTO|nil instance The populated DTO instance or nil if failed
+function CTIECodexDTO:FromJSON(jsonText)
+    writeDebug("FROMJSON:: %d\n%s", jsonText and #jsonText or 0, jsonText)
+    if not jsonText then
+        writeDebug("FROMJSON:: !!EMPTYFILE")
+        return nil
+    end
+
+    local data = dmhub.FromJson(jsonText).result
+    if not data then
+        writeDebug("FROMJSON:: !!INVALIDFORMAT")
+        return nil
+    end
+
+    return self:_fromTable(data)
 end
 
 --------------------------------------------------------------------------------------------------

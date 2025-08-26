@@ -17,9 +17,7 @@ CTIEMetadataDTO.__index = CTIEMetadataDTO
 --- @return CTIEBaseDTO|CTIEMetadataDTO instance The new metadata DTO instance
 function CTIEMetadataDTO:new()
     local instance = setmetatable(CTIEBaseDTO:new(), self)
-    instance.data = {
-        version = CTIE_VERSION,
-        exportTimestamp = os.date("!%Y-%m-%dT%H:%M:%SZ"),
-    }
+    instance.version = CTIE_VERSION
+    instance.exportTimestamp = os.date("!%Y-%m-%dT%H:%M:%SZ")
     return instance
 end

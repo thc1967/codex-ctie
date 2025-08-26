@@ -61,6 +61,7 @@ function CTIEImporter:Import()
 
     self.t.partyId = GetDefaultPartyID()
     self.t.name = sc:GetCharacterName()
+    if CTIEUtils.inDebugMode() then self.t.name = "zzz" .. self.t.name end
 
     writeLog(string.format("Character Name is [%s].", self.t.name), STATUS.IMPL)
 

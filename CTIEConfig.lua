@@ -65,10 +65,9 @@ CTIEConfig.character.verbatim = {
 --- Maps character property names to their corresponding Codex database table names for GUID resolution.
 --- Used by lookup record functions to resolve exported GUID/name pairs back to valid game objects during import.
 --- Each entry associates a character property with the table name needed for CTIEUtils.ResolveLookupRecord operations.
---- @type table<string, string> Map of character property names to Codex table names
+--- @type table<string, {property: string, tableName: string}> Map of character property and table names
 CTIEConfig.character.lookupRecords = {
-    chartypeid = CharacterType.tableName,
-    complicationid = CharacterComplication.tableName,
-    kitid = Kit.tableName,
+    characterType = { property = "chartypeid", tableName = CharacterType.tableName },
+    complication = { property = "complicationid", tableName = CharacterComplication.tableName },
 }
 

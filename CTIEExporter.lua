@@ -4,6 +4,7 @@
 --- a serializable format suitable for character transfer and backup operations.
 --- @class CTIEExporter
 --- @field sourceToken table The source token to be exported
+--- @field codexData CTIEBaseDTO|CTIECodexDTO The DTO we're writing into
 CTIEExporter = RegisterGameType("CTIEExporter")
 CTIEExporter.__index = CTIEExporter
 
@@ -29,26 +30,22 @@ end
 --- to simplify data access patterns throughout the export process.
 --- @private
 --- @return table sourceCharacter The source token's properties object
---- @return CTIECharacterData characterData The character data DTO for encapsulated access
+--- @return CTIEBaseDTO|CTIECodexDTO dto The DTO for encapsulated access
 function CTIEExporter:__getSourceDestCharacterAliases()
-    return self.sourceToken.properties, self.characterData
+    return self.sourceToken.properties, self.dto:Character()
 end
 
---- Exports all character data to a CTIECharacterData object suitable for JSON serialization.
+--- Exports all character data to a CTIECodexDTO object suitable for JSON serialization.
 --- Orchestrates the complete export process by calling specialized export methods for each data category.
 --- Modifies character names with "zzz" prefix when in debug mode for testing purposes.
---- @return CTIECharacterData characterData The complete character data object ready for JSON export
+--- @return CTIEBaseDTO|CTIECodexDTO characterData The complete character data object ready for JSON export
 function CTIEExporter:Export()
-    self.characterData = CTIECharacterData:new()
+    self.dto = CTIECodexDTO:new()
 
     self:_exportToken()
     self:_exportCharacter()
 
-    if CTIEUtils:inDebugMode() then 
-        self.characterData:SetCharacterName("zzz" .. self.characterData:GetCharacterName())
-    end
-
-    return self.characterData
+    return self.dto
 end
 
 --- Exports token-level properties based on configuration settings.
@@ -60,7 +57,7 @@ function CTIEExporter:_exportToken()
 
     for propName, config in pairs(CTIEConfig.token.verbatim) do
         if config.export then
-            self.characterData:SetTokenProperty(propName, st[propName])
+            self.dto:Token():_setData(propName, st[propName])
         end
     end
 end
@@ -70,29 +67,34 @@ end
 --- export methods for ancestry, attributes, career, classes, and culture data.
 --- @private
 function CTIEExporter:_exportCharacter()
-
-    local sc, dc = self:__getSourceDestCharacterAliases()
+    local codexToon, dto = self:__getSourceDestCharacterAliases()
 
     -- Verbatim transfers
     for propName, config in pairs(CTIEConfig.character.verbatim) do
         if config.export then
-            dc:SetCharacterProperty(propName, sc[propName])
+            dto:_setData(propName, codexToon[propName])
         end
     end
 
-    -- Lookup Table Keys  
-    for propName, tableName in pairs(CTIEConfig.character.lookupRecords) do
-        if sc[propName] and stringIsGuid(sc[propName]) then
-            dc:SetLookupRecord(propName, CTIEUtils.MakeLookupRecord(tableName, sc[propName]))
+    -- Lookup Table Keys
+    for propName, config in pairs(CTIEConfig.character.lookupRecords) do
+        if codexToon[config.property] and stringIsGuid(codexToon[config.property]) then
+            if dto[propName] then
+                local guid = codexToon:try_get(config.property)
+                local name = CTIEUtils.GetRecordName(config.tableName, guid)
+                dto[propName]:SetTableName(config.tableName):SetID(guid):SetName(name)
+            else
+                writeDebug("CTIELookupTableDTO:: ERROR:: Method %s not found!", propName)
+            end
         end
     end
 
-    self:_exportAncestry()
-    self:_exportAttributes()
+    -- self:_exportAncestry()
+    -- self:_exportAttributes()
     self:_exportCareer()
-    self:_exportClasses()
-    self:_exportCulture()
-
+    -- self:_exportClasses()
+    -- self:_exportCulture()
+    -- TODO: Kits
 end
 
 --- Exports character ancestry information including race and racial features.
@@ -131,28 +133,114 @@ end
 --- @private
 function CTIEExporter:_exportCareer()
     writeDebug("EXPORTCAREER::")
-    local sc, dc = self:__getSourceDestCharacterAliases()
-    local b = {}
+    local codexToon, dto = self:__getSourceDestCharacterAliases()
 
-    local bg = sc:Background()
-    if bg then
-        writeDebug("EXPORTCAREER:: BACKGROUND:: %s %s %s", bg, sc:BackgroundID(), json(bg))
-        b.backgroundid = CTIEUtils.CreateLookupRecord(Background.tableName, bg.id, bg.name)
+    local career = dto:try_get("career")
+    if career then
+        local bg = codexToon:Background()
+        if bg then
+            writeDebug("EXPORTCAREER:: BACKGROUND:: %s %s %s", bg, codexToon:BackgroundID(), json(bg))
+            local backgroundid = career:try_get("backgroundid")
+            if backgroundid then
+                -- Root background information
+                local guid = codexToon:try_get("backgroundid")
+                local name = CTIEUtils.GetRecordName(Background.tableName, guid)
+                backgroundid:SetTableName(Background.tableName):SetID(guid):SetName(name)
 
-        -- Find Inciting Incident in Notes
-        for _, record in pairs(sc.notes) do
-            if record.title and #record.title and record.title:lower() == "inciting incident" then
-                b.incitingIncident = record
-                break
+                -- Find Inciting Incident in Notes
+                for _, record in pairs(codexToon.notes) do
+                    if record.title and #record.title and record.title:lower() == "inciting incident" then
+                        local incitingIncident = career:try_get("incitingIncident")
+                        if incitingIncident then
+                            incitingIncident:SetTableName(record.tableid):SetID(record.rowid):SetName(record.text)
+                        else
+                            writeDebug("EXPORTCAREER:: ERROR:: incitingIncident not found on career DTO.")
+                        end
+                        break
+                    end
+                end
+
+                -- Export the level choices
+                local careerItem = dmhub.GetTable(Background.tableName)[guid]
+                if careerItem then
+                    local careerFill = careerItem:GetClassLevel()
+                    writeDebug("EXPORTCAREER:: CAREERFILL:: %s", json(careerFill))
+                    if careerFill.features then
+                        self:_exportSelectedFeatures(careerFill.features, career.selectedFeatures)
+                    end
+                else
+                    writeDebug("EXPORTCAREER:: ERROR:: Career ID not in table.")
+                end
+            else
+                writeDebug("EXPORTCAREER:: ERROR:: backgroundid not found on career DTO.")
             end
         end
-
-        -- Export feature choices made
-        b.features = self:_exportFeatures(bg.modifierInfo.features)
+    else
+        writeDebug("EXPORTCAREER:: ERROR:: Career not found on DTO.")
     end
 
-    dc:SetCareer(b)
-    writeDebug("EXPORTCAREER:: %s", json(b))
+    writeDebug("EXPORTCAREER:: %s", json(career:_toTable()))
+end
+
+--- Exports selected features from features table that have matching choices in levelChoices.
+--- Recursively processes nested features while maintaining flat result structure.
+--- @param features table The features table to process
+--- @return table result Flat table with guid keys containing typeName, source, categories, and selections
+function CTIEExporter:_exportFeatures(features)
+    writeDebug("EXPORTFEATURES:: START:: %s", json(features))
+
+    local codexToon, _ = self:__getSourceDestCharacterAliases()
+    local result = {}
+
+    if not features then
+        return result
+    end
+
+    for _, feature in pairs(features) do
+        if feature.guid and codexToon.levelChoices[feature.guid] then
+            writeDebug("EXPORTFEATURES:: MATCH:: %s %s", feature.guid, json(feature))
+
+            -- Build selections table from levelChoices
+            local selections = {}
+            local tableName = CTIEUtils.ChoiceTypeToTableName(feature.typeName)
+
+            for _, choiceGuid in pairs(codexToon.levelChoices[feature.guid]) do
+                if type(choiceGuid) == "string" then -- Skip _luaTable entries
+                    local selection = {
+                        guid = choiceGuid,
+                        tableName = tableName,
+                        name = CTIEUtils.GetRecordName(tableName, choiceGuid)
+                    }
+                    table.insert(selections, selection)
+                end
+            end
+
+            -- Found matching choice in levelChoices
+            local entry = {
+                choiceType = feature.typeName,
+                source = feature:try_get("source") or "",
+                selections = selections
+            }
+
+            -- Add categories if present
+            local categories = feature:try_get("categories")
+            if categories then
+                entry.categories = categories
+            end
+
+            -- Store with guid as key
+            result[feature.guid] = entry
+        end
+
+        -- Recursively process nested features, merging into flat result
+        if feature:try_get("features") then
+            local nestedResults = self:_exportFeatures(feature.features)
+            result = CTIEUtils.MergeTables(result, nestedResults)
+        end
+    end
+
+    writeDebug("EXPORTFEATURES:: COMPLETE:: %s", json(result))
+    return result
 end
 
 --- Exports character class information including levels and class features.
@@ -199,7 +287,8 @@ function CTIEExporter:_exportClasses()
                 writeDebug("EXPORTCLASSES:: SUBCLASS:: FILL:: %s", json(f))
                 for _, item in pairs(f) do
                     if next(item.features) then
-                        classData.features = CTIEUtils.MergeTables(classData.features, self:_exportFeatures(item.features))
+                        classData.features = CTIEUtils.MergeTables(classData.features,
+                            self:_exportFeatures(item.features))
                     end
                 end
             end
@@ -217,7 +306,6 @@ end
 --- and handles special culture language choice selections through the level choice system.
 --- @private
 function CTIEExporter:_exportCulture()
-
     local sc, dc = self:__getSourceDestCharacterAliases()
     local culture = {
         aspects = {},
@@ -226,7 +314,8 @@ function CTIEExporter:_exportCulture()
 
     local function exportCultureAspect(aspectName)
         if stringIsGuid(sc.culture.aspects[aspectName]) then
-            culture.aspects[aspectName] = CTIEUtils.MakeLookupRecord(CultureAspect.tableName, sc.culture.aspects[aspectName])
+            culture.aspects[aspectName] = CTIEUtils.MakeLookupRecord(CultureAspect.tableName,
+                sc.culture.aspects[aspectName])
 
             local caItem = dmhub.GetTable(CultureAspect.tableName)[sc.culture.aspects[aspectName]]
             if caItem then
@@ -240,7 +329,7 @@ function CTIEExporter:_exportCulture()
 
     if sc.levelChoices and sc.levelChoices.cultureLanguageChoice then
         culture.features = {
-            cultureLanguageChoice = { CTIEUtils.MakeLookupRecord(Language.tableName, sc.levelChoices.cultureLanguageChoice[1])}
+            cultureLanguageChoice = { CTIEUtils.MakeLookupRecord(Language.tableName, sc.levelChoices.cultureLanguageChoice[1]) }
         }
     end
 
@@ -261,7 +350,7 @@ end
 --- @private
 --- @param featureList table The list of features to process and export
 --- @return table features The exported feature data organized by feature GUID
-function CTIEExporter:_exportFeatures(featureList)
+function CTIEExporter:_exportFeaturesOld(featureList)
     writeDebug("EXPORTFEATURES:: START:: %s", json(featureList))
 
     local sc, _ = self:__getSourceDestCharacterAliases()
@@ -286,7 +375,7 @@ function CTIEExporter:_exportFeatures(featureList)
                     elseif typeName:find("deity") then
                         selection = CTIEUtils.MakeLookupRecord(Deity.tableName, item)
                         if next(selection) then
-                            self:_addDeityDomains(feature.guid, sc, features)  -- Pass features instead of selections
+                            self:_addDeityDomains(feature.guid, sc, features) -- Pass features instead of selections
                         end
                     elseif typeName:find("feature") then
                         selection = CTIEUtils.MakeFeatureRecord(feature.options, item)
@@ -314,6 +403,14 @@ function CTIEExporter:_exportFeatures(featureList)
     return features
 end
 
+--- Exports features and populates target DTO with selected feature data.
+--- Combines _exportFeatures() and _populateSelectedFeatures() into single operation.
+--- @param features table The features table to process  
+--- @param target CTIESelectedFeaturesDTO The container to populate with selected features
+function CTIEExporter:_exportSelectedFeatures(features, target)
+    self:_populateSelectedFeatures(self:_exportFeatures(features), target)
+end
+
 --- Handles the special case of deity domain selections for deity choice features.
 --- Extracts domain choices associated with deity selections and adds them as separate feature entries
 --- in the main features table rather than nesting them within the deity selection.
@@ -321,7 +418,7 @@ end
 --- @param featureGuid string The GUID of the deity choice feature
 --- @param sourceCharacter table The source character data containing level choices
 --- @param features table The main features table to add domain selections to
-function CTIEExporter:_addDeityDomains(featureGuid, sourceCharacter, features)  -- Changed parameter name
+function CTIEExporter:_addDeityDomains(featureGuid, sourceCharacter, features) -- Changed parameter name
     local domainGuid = featureGuid .. "-domains"
     local domainChoices = sourceCharacter.levelChoices[domainGuid]
     if domainChoices then
@@ -329,11 +426,37 @@ function CTIEExporter:_addDeityDomains(featureGuid, sourceCharacter, features)  
         for _, domainItem in pairs(domainChoices) do
             local domainSelection = CTIEUtils.MakeLookupRecord(DeityDomain.tableName, domainItem)
             if next(domainSelection) then
-                table.insert(domainSelections, domainSelection)  -- Add to separate array
+                table.insert(domainSelections, domainSelection) -- Add to separate array
             end
         end
         if next(domainSelections) then
-            features[domainGuid] = domainSelections  -- Add as separate feature
+            features[domainGuid] = domainSelections -- Add as separate feature
         end
+    end
+end
+
+--- Populates a CTIESelectedFeaturesDTO with processed feature data.
+--- Converts exported feature data into SelectedFeatureDTO objects with LookupTableDTO selections.
+--- @param features table The features table returned from _exportFeatures()
+--- @param targetSelectedFeatures CTIESelectedFeaturesDTO The container to populate with selected features
+function CTIEExporter:_populateSelectedFeatures(features, targetSelectedFeatures)
+    for featureGuid, featureData in pairs(features) do
+        local selectedFeature = CTIESelectedFeatureDTO:new()
+            :SetSource(featureData.source or "")
+            :SetChoiceType(featureData.choiceType)
+
+        if featureData.categories then
+            selectedFeature:SetCategories(featureData.categories)
+        end
+
+        for _, selection in pairs(featureData.selections) do
+            local lookupDTO = CTIELookupTableDTO:new()
+                :SetTableName(selection.tableName)
+                :SetID(selection.guid)
+                :SetName(selection.name)
+            selectedFeature:AddSelection(lookupDTO)
+        end
+
+        targetSelectedFeatures:AddFeature(featureGuid, selectedFeature)
     end
 end

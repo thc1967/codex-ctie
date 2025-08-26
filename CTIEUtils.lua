@@ -26,6 +26,12 @@ local TABLE_NAME_CHOICE_TYPE_MAP = {
     [Skill.tableName] = "CharacterSkillChoice",
 }
 
+local CHOICE_TYPE_TO_TABLE_NAME_MAP = {
+    ["CharacterFeatChoice"] = CharacterFeat.tableName,
+    ["CharacterLanguageChoice"] = Language.tableName,
+    ["CharacterSkillChoice"] = Skill.tableName,
+}
+
 --- Marker used in lookup records to identify features that exist in option lists rather than database tables
 CTIEUtils.FEATURE_TABLE_MARKER = "::FEATURE::"
 
@@ -282,6 +288,26 @@ function CTIEUtils.ResolveFeatureRecord(featureStructure, featureRecord)
     return featureRecord.guid
 end
 
+--- Retrieves the display name for a record from a table using its GUID.
+--- @param tableName string The name of the table containing the record
+--- @param guid string The GUID of the record to look up
+--- @return string name The display name of the record, or empty string if not found
+function CTIEUtils.GetRecordName(tableName, guid)
+    CTIEUtils.writeDebug("GETRECORDNAME:: TABLE:: %s GUID:: %s", tableName, guid)
+
+    if not tableName or not guid then
+        return ""
+    end
+
+    local table = dmhub.GetTable(tableName)
+    if not table then
+        return ""
+    end
+
+    local record = table[guid]
+    return (record and record.name) and record.name or ""
+end
+
 --- Creates a lookup record by retrieving name information from a Codex game table.
 --- Takes a table name and GUID, looks up the corresponding record to get the display name,
 --- and creates a complete lookup record suitable for export operations.
@@ -294,14 +320,7 @@ function CTIEUtils.MakeLookupRecord(tableName, guid)
     if not tableName or not guid then
         return CTIEUtils.CreateLookupRecord(tableName, guid, "")
     end
-
-    local table = dmhub.GetTable(tableName)
-    if not table then
-        return CTIEUtils.CreateLookupRecord(tableName, guid, "")
-    end
-
-    local record = table[guid]
-    local name = (record and record.name) and record.name or ""
+    local name = CTIEUtils.GetRecordName(tableName, guid)
 
     return CTIEUtils.CreateLookupRecord(tableName, guid, name)
 end
@@ -336,9 +355,16 @@ function CTIEUtils.ResolveLookupRecord(tableName, name, guid)
     return nil
 end
 
+--- Maps choice types to table names.
+--- @param choiceType string The choice type to look up
+--- @return string tableName The choice type or empty string if not found
+function CTIEUtils.ChoiceTypeToTableName(choiceType)
+    return CHOICE_TYPE_TO_TABLE_NAME_MAP[choiceType] or ""
+end
+
 --- Maps table names to choice types via TABLE_NAME_CHOICE_TYPE_MAP lookup.
 --- @param tableName string The table name to map
---- @return string The choice type or empty string if not found
+--- @return string choiceType The choice type or empty string if not found
 function CTIEUtils.TableNameToChoiceType(tableName)
     return TABLE_NAME_CHOICE_TYPE_MAP[tableName] or ""
 end
