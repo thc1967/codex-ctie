@@ -333,7 +333,7 @@ end
 --- @param guid string|nil The GUID to lookup or return as fallback
 --- @return string|nil guid The resolved GUID, or nil if all resolution attempts fail
 function CTIEUtils.ResolveLookupRecord(tableName, name, guid)
-    CTIEUtils.writeDebug("RESOLVELOOKUPRECORD:: table[%s] name[%s] guid[%s]", tableName or "nil", name or "nil", guid or "nil")
+    CTIEUtils.writeDebug("RESOLVELOOKUPRECORD:: table [%s] name [%s] guid [%s]", tableName or "nil", name or "nil", guid or "nil")
 
     -- If we have a table name and a guid, do the lookup by key. If found, return the guid.
     if tableName and guid then
@@ -342,6 +342,7 @@ function CTIEUtils.ResolveLookupRecord(tableName, name, guid)
             return guid
         end
     end
+    CTIEUtils.writeDebug("RESOLVELOOKUPRECORD:: No Table or GUID not found in table.")
 
     -- If we have a table name and a name, do the lookup via TableLookupFromName. If found, return the guid.
     if tableName and name and #name > 0 then

@@ -5,7 +5,7 @@
 --- required by the Codex game system.
 ---
 --- The import process involves multiple phases:
---- - JSON parsing and validation through CTIECharacterData
+--- - JSON parsing and validation through CTIECodexDTO
 --- - Token-level property restoration including ownership, portraits, and display settings
 --- - Character-level data import including attributes, ancestry, career, culture, and classes
 --- - Feature choice resolution and application through specialized importer classes
@@ -14,7 +14,7 @@
 --- The class coordinates with specialized importers (CTIECareerImporter, CTIELevelChoiceImporter)
 --- to handle complex data structures and maintains comprehensive logging throughout the process.
 --- @class CTIEImporter
---- @field characterData CTIECharacterData The parsed character data from the JSON import file
+--- @field dto CTIECodexDTO The parsed character data from the JSON import file
 --- @field t table The Codex token object being created during import
 --- @field c table The Codex character properties object being populated during import
 CTIEImporter = RegisterGameType("CTIEImporter")
@@ -26,13 +26,13 @@ local stringIsGuid = CTIEUtils.StringIsGuid
 local STATUS = CTIEUtils.STATUS
 
 --- Creates a new CTIEImporter instance with pre-populated character data.
---- Takes a populated CTIECharacterData object for import operations, eliminating the JSON parsing
+--- Takes a populated CTIECodexDTO object for import operations, eliminating the JSON parsing
 --- responsibility from the importer and allowing for programmatic character data construction.
---- @param characterData CTIECharacterData The populated character data object for import
+--- @param dto CTIECodexDTO The populated character data object for import
 --- @return CTIEImporter instance The new importer instance with character data
-function CTIEImporter:new(characterData)
+function CTIEImporter:new(dto)
     local instance = setmetatable({}, self)
-    instance.characterData = characterData
+    instance.dto = dto
     return instance
 end
 
@@ -40,19 +40,20 @@ end
 --- Returns references to the source character data from JSON and the destination character
 --- properties being populated, simplifying data access patterns throughout import methods.
 --- @private
---- @return CTIECharacterData characterData The character data DTO for encapsulated access
---- @return table destinationCharacter The Codex character properties being populated
+--- @return CTIEBaseDTO|CTIECharacterDTO dto The character data DTO for encapsulated access
+--- @return table codexToon The Codex character properties being populated
 function CTIEImporter:__getSourceDestCharacterAliases()
-    return self.characterData, self.c
+    return self.dto:Character(), self.c
 end
 
 --- Orchestrates the complete character import process and creates the final Codex character.
 --- Creates a new Codex character object, populates it with imported data through specialized
 --- import methods, and integrates it into the game system via the Codex import framework.
 function CTIEImporter:Import()
-    local sc = self.characterData
+    writeDebug("IMPORT:: %s", json(self.dto))
+    local dto = self.dto
 
-    writeDebug("ImportToCodex:: %s", sc:GetCharacterName())
+    writeDebug("ImportToCodex:: %s", dto:GetCharacterName())
     writeLog("Codex Character Import starting.", STATUS.INFO, 1)
 
     self.t = import:CreateCharacter()
@@ -60,14 +61,16 @@ function CTIEImporter:Import()
     self.c = self.t.properties
 
     self.t.partyId = GetDefaultPartyID()
-    self.t.name = sc:GetCharacterName()
-    if CTIEUtils.inDebugMode() then self.t.name = "zzz" .. self.t.name end
+    self.t.name = (CTIEUtils.inDebugMode() and "zzz" or "") .. dto:GetCharacterName()
 
     writeLog(string.format("Character Name is [%s].", self.t.name), STATUS.IMPL)
+    writeLog(string.format("Career Background Name is [%s].", dto:Character():Career():GuidLookup().name))
 
+    -- Move values into the Codex token & character objects
     self:_importToken()
     self:_importCharacter()
 
+    -- Execute the Codex import
     import:ImportCharacter(self.t)
 
     writeLog("Codex Character Import complete.", STATUS.INFO, -1)
@@ -80,54 +83,56 @@ end
 function CTIEImporter:_importToken()
     writeLog("Token import starting.", STATUS.INFO, 1)
 
-    local sc = self.characterData
-    local dt = self.t
+    local dtoToken = self.dto:Token()
+    local codexToken = self.t
 
     writeLog("Verbatim property import starting.", STATUS.INFO, 1)
     for propName, config in pairs(CTIEConfig.token.verbatim) do
         if config.import then
-            if sc:HasTokenProperty(propName) then
+            local value = dtoToken:_getProp(propName)
+            if value then
                 writeDebug("IMPORTTOKEN:: PROP:: %s", propName)
                 writeLog(string.format("Adding property [%s].", propName), STATUS.IMPL)
-                dt[propName] = sc:GetTokenProperty(propName)
+                codexToken[propName] = value
             end
         end
     end
     writeLog("Verbatim property import complete.", STATUS.INFO, -1)
 
-    if sc:HasPortraitOffset() then
-        local offset = sc:GetPortraitOffset()
+    local offset = dtoToken:_getProp("portraitOffset")
+    if offset then
         writeDebug("IMPORTTOKEN:: PORTRAITOFFSET:: TYPE:: %s VALUE:: %s", type(offset), json(offset))
-        dt.portraitOffset = core.Vector2(offset.x, offset.y)
+        codexToken.portraitOffset = core.Vector2(offset.x, offset.y)
         writeLog("Adding property [portraitOffset].", STATUS.IMPL)
     end
 
-    if sc:GetOwnerId() then
-        writeDebug("IMPORTTOKEN:: OWNERID:: %s", sc:GetOwnerId())
-        if "PARTY" ~= sc:GetOwnerId() then
+    local ownerId = dtoToken:_getProp("ownerId")
+    if ownerId then
+        writeDebug("IMPORTTOKEN:: OWNERID:: %s", ownerId)
+        if "PARTY" ~= ownerId then
             writeDebug("DMHUBUSERS:: %s %s", dmhub.users, json(dmhub.users))
             for _, id in ipairs(dmhub.users) do
                 writeDebug("IMPORTTOKEN:: OWNERID:: TESTING:: %s", id)
-                if id == sc:GetOwnerId() then
+                if id == ownerId then
                     writeDebug("IMPORTTOKEN:: OWNERID:: FOUND")
-                    dt.ownerId = sc:GetOwnerId()
-                    writeLog(string.format("Setting owner to [%s].", dmhub.GetDisplayName(dt.ownerId)), STATUS.IMPL)
+                    codexToken.ownerId = ownerId
+                    writeLog(string.format("Setting owner to [%s].", dmhub.GetDisplayName(codexToken.ownerId)), STATUS.IMPL)
                     break
                 end
             end
         end
-    end
-
-    if sc:GetPartyId() and stringIsGuid(sc:GetPartyId()) and dt.ownerId == nil then
-        if CTIEUtils.TableIdExists(Party.tableName, sc:GetPartyId()) then
-            local partyName = dmhub.GetTable(Party.tableName)[dt.partyId].name
-            dt.partyId = sc:GetPartyId()
+    else
+        -- No owner; try to set the Party
+        local partyId = dtoToken:_getProp("partyId")
+        local partyName = CTIEUtils:GetRecordName(Party.tableName, partyId)
+        if partyName and #partyName then
+            codexToken.partyId = partyId
             writeLog(string.format("Setting party to [%s].", partyName), STATUS.IMPL)
         end
     end
 
-    if not dt.partyId or #dt.partyId == 0 then
-        dt.partyId = GetDefaultPartyID()
+    if not codexToken.partyId or #codexToken.partyId == 0 then
+        codexToken.partyId = GetDefaultPartyID()
         writeLog("Setting party to default.", STATUS.IMPL)
     end
 
@@ -139,50 +144,52 @@ end
 --- ancestry, career, culture, classes, attributes, and lookup record resolution.
 --- @private
 function CTIEImporter:_importCharacter()
-
     writeLog("Character Import starting.", STATUS.INFO, 1)
 
-    local sc, dc = self:__getSourceDestCharacterAliases()
+    local dto, codexToon = self:__getSourceDestCharacterAliases()
+
+    -- Lookup table values
+    writeLog("Simple Lookup import starting.", STATUS.INFO, 1)
+    for propName, config in pairs(CTIEConfig.character.lookupRecords) do
+        local r = dto:_getProp(propName)
+        writeDebug("IMPORTCHARACTER:: SIMPLELOOKUP:: %s -> %s", propName, json(r))
+        if r then
+            local guid = CTIEUtils.ResolveLookupRecord(config.tableName, r.name, r.guid)
+            if guid then
+                writeLog(string.format("Adding [%s].", propName), STATUS.IMPL)
+                local v = codexToon:get_or_add(propName, guid)
+                v = guid
+            end
+        end
+    end
+    writeLog("Simple Lookup import complete.", STATUS.INFO, -1)
 
     -- Verbatim copies
     writeLog("Verbatim property import starting.", STATUS.INFO, 1)
     for propName, config in pairs(CTIEConfig.character.verbatim) do
         if config.import then
-            if sc:HasCharacterProperty(propName) then
-                writeDebug("IMPORTCHARACTER:: %s", propName)
+            local value = dto:_getProp(propName)
+            writeDebug("IMPORTCHARACTER:: VERBATIM:: %s -> %s", propName, json(value))
+            if value then
+                writeDebug("IMPORTCHARACTER:: VERBATIM:: %s", propName)
                 writeLog(string.format("Adding property [%s].", propName), STATUS.IMPL)
-                local v = dc:get_or_add(propName, {})
+                local v = codexToon:get_or_add(propName, {})
                 if config.keyed then
-                    v = CTIEUtils.MergeTables(v, sc:GetCharacterProperty(propName))
+                    v = CTIEUtils.MergeTables(v, value)
                 else
-                    v = CTIEUtils.AppendList(v, sc:GetCharacterProperty(propName))
+                    v = CTIEUtils.AppendList(v, value)
                 end
             end
         end
     end
     writeLog("Verbatim property import complete.", STATUS.INFO, -1)
 
-    self:_importAncestry()
+    -- self:_importAncestry()
     self:_importCareer()
-    self:_importCulture()
-    self:_importClasses()
-    self:_importAttributeBuild()
-    self:_importAttributes()
-
-    -- Lookup table values
-    writeLog("Simple Lookup import starting.", STATUS.INFO, 1)
-    for propName, tableName in pairs(CTIEConfig.character.lookupRecords) do
-        if sc:HasLookupRecord(propName) then
-            local r = sc:GetLookupRecord(propName)
-            local guid = CTIEUtils.ResolveLookupRecord(tableName, r.name, r.guid)
-            if guid then
-                writeLog(string.format("Adding [%s].", propName), STATUS.IMPL)
-                local v = dc:get_or_add(propName, guid)
-                v = guid
-            end
-        end
-    end
-    writeLog("Simple Lookup import complete.", STATUS.INFO, -1)
+    -- self:_importCulture()
+    -- self:_importClasses()
+    -- self:_importAttributeBuild()
+    -- self:_importAttributes()
 
     writeLog("Character Import complete.", STATUS.INFO, -1)
 end
@@ -261,8 +268,8 @@ end
 --- inciting incident matching, and career-related feature choice restoration.
 --- @private
 function CTIEImporter:_importCareer()
-    local sc, dc = self:__getSourceDestCharacterAliases()
-    local careerImporter = CTIECareerImporter:new(sc, dc)
+    local sc, dc = self:__getSourceDestCharacterAliases() --TODO:
+    local careerImporter = CTIECareerImporter:new(self:__getSourceDestCharacterAliases())
     careerImporter:Import()
 end
 

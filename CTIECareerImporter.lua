@@ -2,8 +2,8 @@
 --- This class processes background information, inciting incidents, and associated level choices,
 --- translating them back into the Codex game system format during character import operations.
 --- @class CTIECareerImporter
---- @field characterData CTIECharacterData The character data DTO containing career information
---- @field destinationCharacter table The destination character object in the Codex system
+--- @field dto CTIEBaseDTO|CTIECharacterDTO The character data DTO containing career information
+--- @field codexToon table The destination character object in the Codex system
 CTIECareerImporter = RegisterGameType("CTIECareerImporter")
 CTIECareerImporter.__index = CTIECareerImporter
 
@@ -12,13 +12,13 @@ local writeLog = CTIEUtils.writeLog
 local STATUS = CTIEUtils.STATUS
 
 --- Creates a new CTIECareerImporter instance for importing career data.
---- @param characterData table The source character data from the exported JSON file
---- @param destinationCharacter table The destination character object in the Codex system
+--- @param dto CTIEBaseDTO|CTIECharacterDTO The source character data from the exported JSON file
+--- @param codexToon table The destination character object in the Codex system
 --- @return CTIECareerImporter instance The new importer instance
-function CTIECareerImporter:new(characterData, destinationCharacter)
+function CTIECareerImporter:new(dto, codexToon)
     local instance = setmetatable({}, self)
-    instance.characterData = characterData
-    instance.destinationCharacter = destinationCharacter
+    instance.dto = dto
+    instance.codexToon = codexToon
     return instance
 end
 
@@ -29,17 +29,30 @@ function CTIECareerImporter:Import()
     writeDebug("IMPORTCAREER::")
     writeLog("Career starting.", STATUS.INFO, 1)
 
-    local career = self.characterData:GetCareer()
-    if career and career.backgroundid then
-        local backgroundGuid = self:_importBackground(career.backgroundid)
+    local career = self.dto:Career()
+    if career then
+        local guidLookup = career:GuidLookup()
+        if guidLookup then
+            local careerGuid = self:_importCareer(guidLookup)
+            if careerGuid then
 
-        if career.incitingIncident and backgroundGuid then
-            self:_importIncitingIncident(career, backgroundGuid)
-        end
+                if career.incitingIncident then
+                    self:_importIncitingIncident(career, careerGuid)
+                end
 
-        if career.features then
-            local lcImporter = CTIELevelChoiceImporter:new(self.destinationCharacter)
-            lcImporter:Import(career.features)
+                local selectedFeatures = career:SelectedFeatures()
+                if selectedFeatures then
+                    local levelFill = dmhub.GetTable(Background.tableName)[careerGuid]:GetClassLevel()
+                    if levelFill and levelFill.features then
+                        local levelChoices = CTIELevelChoiceImporter:new(selectedFeatures, levelFill.features)
+                        writeDebug("IMPORTCAREER:: LEVELCHOICES:: %s", json(levelChoices))
+                        if next(levelChoices) then
+                            local lc = self.codexToon:GetLevelChoices()
+                            CTIEUtils.MergeTables(lc, levelChoices)
+                        end
+                    end
+                end
+            end
         end
     end
 
@@ -49,13 +62,13 @@ end
 --- Imports and resolves the character's background from exported lookup record data.
 --- Uses CTIEUtils.ResolveLookupRecord to match the background by GUID or name and assigns it to the destination character.
 --- @private
---- @param backgroundData table The background lookup record containing tableName, guid, and name
+--- @param guidLookup CTIEBaseDTO|CTIELookupTableDTO The background lookup record containing tableName, guid, and name
 --- @return string|nil guid The resolved background GUID if successful, nil if failed
-function CTIECareerImporter:_importBackground(backgroundData)
-    local guid = CTIEUtils.ResolveLookupRecord(Background.tableName, backgroundData.name, backgroundData.guid)
+function CTIECareerImporter:_importCareer(guidLookup)
+    local guid = CTIEUtils.ResolveLookupRecord(Background.tableName, guidLookup:GetName(), guidLookup:GetID())
     if guid then
-        writeLog(string.format("Adding Career [%s]", backgroundData.name), STATUS.IMPL)
-        self.destinationCharacter:get_or_add("backgroundid", guid)
+        writeLog(string.format("Adding Career [%s]", guidLookup:GetName()), STATUS.IMPL)
+        self.codexToon:get_or_add("backgroundid", guid)
     end
     return guid
 end
@@ -64,23 +77,23 @@ end
 --- Searches through the background's characteristics to find matching inciting incident entries,
 --- either by row ID or by fuzzy name matching, then adds the result as a character note.
 --- @private
---- @param careerData table The career data containing inciting incident information
---- @param backgroundGuid string The resolved GUID of the character's background
-function CTIECareerImporter:_importIncitingIncident(careerData, backgroundGuid)
+--- @param career CTIECareerDTO|CTIEBaseDTO The career data containing inciting incident information
+--- @param careerGuid string The resolved GUID of the character's background
+function CTIECareerImporter:_importIncitingIncident(career, careerGuid)
     writeLog("Inciting Incident starting.", STATUS.INFO, 1)
 
-    local careerItem = dmhub.GetTable(Background.tableName)[backgroundGuid]
+    local careerItem = dmhub.GetTable(Background.tableName)[careerGuid]
     local incidentNote = nil
 
     if careerItem then
-        incidentNote = self:_findIncitingIncidentMatch(careerItem, careerData.incitingIncident)
+        incidentNote = self:_findIncitingIncidentMatch(careerItem, career:IncitingIncident())
         if incidentNote then
             writeLog(string.format("Adding Inciting Incident [%s]", incidentNote.text:sub(1, 24)), STATUS.IMPL)
-            local notes = self.destinationCharacter:get_or_add("notes", {})
+            local notes = self.codexToon:get_or_add("notes", {})
             notes[#notes + 1] = incidentNote
         end
     else
-        writeLog(string.format("!!! Career [%s] not found in table.", backgroundGuid), STATUS.ERROR)
+        writeLog(string.format("!!! Career [%s] not found in table.", careerGuid), STATUS.ERROR)
     end
 
     writeLog("Inciting Incident complete.", STATUS.INFO, -1)
@@ -91,7 +104,7 @@ end
 --- and searching their associated table rows for matches.
 --- @private
 --- @param careerItem table The background item from the game's Background table
---- @param incidentData table The inciting incident data from the exported character
+--- @param incidentData CTIELookupTableDTO|CTIEBaseDTO The inciting incident data from the exported character
 --- @return table|nil note The created note object if a match is found, nil otherwise
 function CTIECareerImporter:_findIncitingIncidentMatch(careerItem, incidentData)
     for _, characteristic in pairs(careerItem.characteristics) do
@@ -119,7 +132,7 @@ end
 --- using both direct ID matching and fuzzy name matching.
 --- @private
 --- @param characteristic table The background characteristic containing the table ID
---- @param incidentData table The inciting incident data to match against
+--- @param incidentData CTIELookupTableDTO|CTIEBaseDTO The inciting incident data to match against
 --- @return table|nil note The created note object if a match is found, nil otherwise
 function CTIECareerImporter:_searchCharacteristicRows(characteristic, incidentData)
     writeDebug(string.format("INCITINGINCIDENT:: CHARACTERISTIC type [%s] table [%s]",
@@ -145,11 +158,11 @@ end
 --- Checks for matches using both direct row ID comparison and fuzzy name matching via _incidentNamesMatch.
 --- @private
 --- @param row table The table row to evaluate
---- @param incidentData table The inciting incident data containing rowid and text
+--- @param incidentData CTIELookupTableDTO|CTIEBaseDTO The inciting incident data containing rowid and text
 --- @return boolean matches True if the row matches the incident data
 function CTIECareerImporter:_incidentMatches(row, incidentData)
-    return row.id == incidentData.rowid or
-        self:_incidentNamesMatch(incidentData.text, row.value.items[1].value)
+    return row.id == incidentData:GetID() or
+        self:_incidentNamesMatch(incidentData:GetName() or "", row.value.items[1].value)
 end
 
 --- Compares inciting incident names using fuzzy matching logic.

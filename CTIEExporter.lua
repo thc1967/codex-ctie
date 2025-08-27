@@ -30,7 +30,7 @@ end
 --- to simplify data access patterns throughout the export process.
 --- @private
 --- @return table sourceCharacter The source token's properties object
---- @return CTIEBaseDTO|CTIECodexDTO dto The DTO for encapsulated access
+--- @return CTIEBaseDTO|CTIECharacterDTO dto The DTO for encapsulated access
 function CTIEExporter:__getSourceDestCharacterAliases()
     return self.sourceToken.properties, self.dto:Character()
 end
@@ -57,7 +57,7 @@ function CTIEExporter:_exportToken()
 
     for propName, config in pairs(CTIEConfig.token.verbatim) do
         if config.export then
-            self.dto:Token():_setData(propName, st[propName])
+            self.dto:Token():_setProp(propName, st[propName])
         end
     end
 end
@@ -72,7 +72,7 @@ function CTIEExporter:_exportCharacter()
     -- Verbatim transfers
     for propName, config in pairs(CTIEConfig.character.verbatim) do
         if config.export then
-            dto:_setData(propName, codexToon[propName])
+            dto:_setProp(propName, codexToon[propName])
         end
     end
 
@@ -135,22 +135,22 @@ function CTIEExporter:_exportCareer()
     writeDebug("EXPORTCAREER::")
     local codexToon, dto = self:__getSourceDestCharacterAliases()
 
-    local career = dto:try_get("career")
+    local career = dto:Career("career")
     if career then
         local bg = codexToon:Background()
         if bg then
             writeDebug("EXPORTCAREER:: BACKGROUND:: %s %s %s", bg, codexToon:BackgroundID(), json(bg))
-            local backgroundid = career:try_get("backgroundid")
-            if backgroundid then
+            local careerId = career:GuidLookup()
+            if careerId then
                 -- Root background information
                 local guid = codexToon:try_get("backgroundid")
                 local name = CTIEUtils.GetRecordName(Background.tableName, guid)
-                backgroundid:SetTableName(Background.tableName):SetID(guid):SetName(name)
+                careerId:SetTableName(Background.tableName):SetID(guid):SetName(name)
 
                 -- Find Inciting Incident in Notes
                 for _, record in pairs(codexToon.notes) do
                     if record.title and #record.title and record.title:lower() == "inciting incident" then
-                        local incitingIncident = career:try_get("incitingIncident")
+                        local incitingIncident = career:IncitingIncident()
                         if incitingIncident then
                             incitingIncident:SetTableName(record.tableid):SetID(record.rowid):SetName(record.text)
                         else
@@ -179,7 +179,7 @@ function CTIEExporter:_exportCareer()
         writeDebug("EXPORTCAREER:: ERROR:: Career not found on DTO.")
     end
 
-    writeDebug("EXPORTCAREER:: %s", json(career:_toTable()))
+    writeDebug("EXPORTCAREER:: %s", json(career))
 end
 
 --- Exports selected features from features table that have matching choices in levelChoices.
@@ -442,6 +442,7 @@ end
 function CTIEExporter:_populateSelectedFeatures(features, targetSelectedFeatures)
     for featureGuid, featureData in pairs(features) do
         local selectedFeature = CTIESelectedFeatureDTO:new()
+            :SetChoiceId(featureGuid)
             :SetSource(featureData.source or "")
             :SetChoiceType(featureData.choiceType)
 
@@ -457,6 +458,6 @@ function CTIEExporter:_populateSelectedFeatures(features, targetSelectedFeatures
             selectedFeature:AddSelection(lookupDTO)
         end
 
-        targetSelectedFeatures:AddFeature(featureGuid, selectedFeature)
+        targetSelectedFeatures:AddFeature(selectedFeature)
     end
 end

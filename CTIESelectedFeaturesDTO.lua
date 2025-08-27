@@ -2,7 +2,7 @@ local writeDebug = CTIEUtils.writeDebug
 local writeLog = CTIEUtils.writeLog
 local STATUS = CTIEUtils.STATUS
 
---- Container DTO for managing multiple selected features.
+--- Container DTO for managing multiple selected features as an array.
 --- @class CTIESelectedFeaturesDTO
 CTIESelectedFeaturesDTO = RegisterGameType("CTIESelectedFeaturesDTO", "CTIEBaseDTO")
 CTIESelectedFeaturesDTO.__index = CTIESelectedFeaturesDTO
@@ -11,32 +11,34 @@ CTIESelectedFeaturesDTO.__index = CTIESelectedFeaturesDTO
 --- @return CTIEBaseDTO|CTIESelectedFeaturesDTO instance The new selected features container DTO instance
 function CTIESelectedFeaturesDTO:new()
     local instance = setmetatable(CTIEBaseDTO:new(), self)
+    instance:_setProp("features", {})
     return instance
 end
 
---- Adds a selected feature to the container.
---- @param guid string The GUID key for the feature
+--- Adds a selected feature to the container array.
 --- @param selectedFeatureDTO CTIESelectedFeatureDTO The selected feature DTO to add
 --- @return CTIESelectedFeaturesDTO self Returns self for method chaining
-function CTIESelectedFeaturesDTO:AddFeature(guid, selectedFeatureDTO)
-    return self:_setData(guid, selectedFeatureDTO)
+function CTIESelectedFeaturesDTO:AddFeature(selectedFeatureDTO)
+    local features = self:_getProp("features") or {}
+    table.insert(features, selectedFeatureDTO)
+    return self:_setProp("features", features)
 end
 
---- Retrieves a selected feature by GUID.
---- @param guid string The GUID key for the feature
+--- Retrieves a selected feature by choice ID.
+--- @param choiceId string The choice ID to search for
 --- @return CTIESelectedFeatureDTO|nil feature The selected feature DTO or nil if not found
-function CTIESelectedFeaturesDTO:GetFeature(guid)
-    return self:_getData(guid)
-end
-
---- Retrieves all selected features.
---- @return table features Table of all selected features with GUID keys
-function CTIESelectedFeaturesDTO:GetAllFeatures()
-    local features = {}
-    for k, v in pairs(self) do
-        if self:_isCTIEDTO(v) and v.typeName == "CTIESelectedFeatureDTO" then
-            features[k] = v
+function CTIESelectedFeaturesDTO:GetFeature(choiceId)
+    local features = self:_getProp("features") or {}
+    for _, feature in pairs(features) do
+        if feature:GetChoiceId() == choiceId then
+            return feature
         end
     end
-    return features
+    return nil
+end
+
+--- Retrieves all selected features as an array.
+--- @return table features Array of all selected feature DTOs
+function CTIESelectedFeaturesDTO:GetAllFeatures()
+    return self:_getProp("features") or {}
 end

@@ -25,7 +25,7 @@ CTIEConfig.token = {}
 --- Properties marked as import=true will be restored when importing characters.
 --- @type table<string, {export: boolean, import: boolean}> Map of property names to export/import flags
 CTIEConfig.token.verbatim = {
-    name = { export = true, import = true },
+    name = { export = true, import = false },
     anthem = { export = true, import = true },
     anthemVolume = { export = true, import = true },
     invisibleToPlayers = { export = true, import = true },

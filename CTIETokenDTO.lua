@@ -16,9 +16,9 @@ function CTIETokenDTO:new()
 end
 
 function CTIETokenDTO:SetName(name)
-    return self:_setData("name", name)
+    return self:_setProp("name", name)
 end
 
 function CTIETokenDTO:GetName()
-    return self:_getData("name") or ""
+    return self:_getProp("name") or ""
 end

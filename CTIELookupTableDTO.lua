@@ -19,39 +19,39 @@ end
 --- @param tableName string The name of the table containing the record
 --- @return CTIELookupTableDTO self Returns self for method chaining
 function CTIELookupTableDTO:SetTableName(tableName)
-    return self:_setData("tableName", tableName)
+    return self:_setProp("tableName", tableName)
 end
 
 --- Gets the table name for this lookup record.
 --- @return string|nil tableName The table name, or nil if not set
 function CTIELookupTableDTO:GetTableName()
-    return self:_getData("tableName")
+    return self:_getProp("tableName")
 end
 
 --- Sets the display name for this lookup record.
 --- @param name string The display name of the record
 --- @return CTIELookupTableDTO self Returns self for method chaining
 function CTIELookupTableDTO:SetName(name)
-    return self:_setData("name", name)
+    return self:_setProp("name", name)
 end
 
 --- Gets the display name for this lookup record.
 --- @return string|nil name The display name, or nil if not set
 function CTIELookupTableDTO:GetName()
-    return self:_getData("name")
+    return self:_getProp("name")
 end
 
 --- Sets the GUID for this lookup record.
 --- @param guid string The GUID of the record
 --- @return CTIELookupTableDTO self Returns self for method chaining
 function CTIELookupTableDTO:SetID(guid)
-    return self:_setData("guid", guid)
+    return self:_setProp("guid", guid)
 end
 
 --- Gets the GUID for this lookup record.
 --- @return string|nil guid The GUID, or nil if not set
 function CTIELookupTableDTO:GetID()
-    return self:_getData("guid")
+    return self:_getProp("guid")
 end
 
 --- Returns the lookup record as a plain table structure.

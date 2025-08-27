@@ -13,22 +13,28 @@ CTIECodexDTO.__index = CTIECodexDTO
 --- @return CTIEBaseDTO|CTIECodexDTO instance The new Codex DTO instance
 function CTIECodexDTO:new()
     local instance = setmetatable(CTIEBaseDTO:new(), self)
-    instance.metadata = CTIEMetadataDTO:new()
-    instance.token = CTIETokenDTO:new()
-    instance.character = CTIECharacterDTO:new()
+    instance:_setProp("metadata", CTIEMetadataDTO:new())
+    instance:_setProp("token", CTIETokenDTO:new())
+    instance:_setProp("character", CTIECharacterDTO:new())
     return instance
 end
 
+--- Gets the metadata information.
+--- @return CTIEMetadataDTO metadata The metadata DTO
 function CTIECodexDTO:Metadata()
-    return self:_getData("medadata")
+    return self:_getProp("metadata")
 end
 
+--- Gets the token data.
+--- @return CTIETokenDTO token The token DTO
 function CTIECodexDTO:Token()
-    return self:_getData("token")
+    return self:_getProp("token")
 end
 
+--- Gets the character data.
+--- @return CTIECharacterDTO character The character DTO
 function CTIECodexDTO:Character()
-    return self:_getData("character")
+    return self:_getProp("character")
 end
 
 function CTIECodexDTO:GetCharacterName()
@@ -38,7 +44,7 @@ end
 --- Converts Codex DTO to JSON string for file export.
 --- @return string json The complete character data as a JSON string
 function CTIECodexDTO:ToJSON()
-    return json(self:_toTable())
+    return json(self)
 end
 
 --- Converts JSON string to DTO instance using embedded type names.
@@ -79,7 +85,7 @@ CTIECharacterData.__index = CTIECharacterData
 --- @return CTIECharacterData instance The new character data instance with metadata and empty token/character objects
 function CTIECharacterData:new()
     local instance = setmetatable({}, self)
-    instance.data = {
+    instance.data =  {
         metadata = {
             version = CTIE_VERSION,
             exportTimestamp = os.date("!%Y-%m-%dT%H:%M:%SZ"), -- ISO 8601 UTC format
