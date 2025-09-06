@@ -92,7 +92,7 @@ function CTIEExporter:_exportCharacter()
     -- self:_exportAncestry()
     -- self:_exportAttributes()
     self:_exportCareer()
-    -- self:_exportClasses()
+    self:_exportClass()
     -- self:_exportCulture()
     -- TODO: Kits
 end
@@ -166,7 +166,7 @@ function CTIEExporter:_exportCareer()
                     local careerFill = careerItem:GetClassLevel()
                     writeDebug("EXPORTCAREER:: CAREERFILL:: %s", json(careerFill))
                     if careerFill.features then
-                        self:_exportSelectedFeatures(careerFill.features, career.selectedFeatures)
+                        self:_exportSelectedFeatures(careerFill.features, career:SelectedFeatures())
                     end
                 else
                     writeDebug("EXPORTCAREER:: ERROR:: Career ID not in table.")
@@ -209,8 +209,22 @@ function CTIEExporter:_exportFeatures(features)
                     local selection = {
                         guid = choiceGuid,
                         tableName = tableName,
-                        name = CTIEUtils.GetRecordName(tableName, choiceGuid)
+                        name = ""
                     }
+
+                    if tableName == CTIEUtils.FEATURE_TABLE_MARKER and feature.options then
+                        -- Search through options list for matching GUID
+                        for _, option in pairs(feature.options) do
+                            if option.guid == choiceGuid then
+                                selection.name = option.name or ""
+                                break
+                            end
+                        end
+                    else
+                        -- Normal table lookup
+                        selection.name = CTIEUtils.GetRecordName(tableName, choiceGuid)
+                    end
+
                     table.insert(selections, selection)
                 end
             end
@@ -247,58 +261,58 @@ end
 --- Processes all character classes, extracts class levels, and exports class-specific features
 --- by filling level progression data and processing both main classes and subclasses.
 --- @private
-function CTIEExporter:_exportClasses()
+function CTIEExporter:_exportClass()
     writeDebug("EXPORTCLASSES::")
 
-    local sc, dc = self:__getSourceDestCharacterAliases()
+    local codexToon, dto = self:__getSourceDestCharacterAliases()
+    local dtoClass = dto:Class()
 
-    local classes = {}
+    -- Although the game engine supports multiclassing, the
+    -- game system itself does not. Stop at the first class.
+    local sourceClasses = codexToon.classes or {}
+    local _, class = next(sourceClasses)
+    if class then
+        if type(class) == "table" and class.classid and stringIsGuid(class.classid) then
 
-    local sourceClasses = sc.classes or {}
-    for _, class in pairs(sourceClasses) do
-        -- Skip the _luaTable marker
-        if type(class) == "table" then
-            local classData = {}
+            local classGuid = dtoClass:GuidLookup()
+            if classGuid then
+                -- Store the lookup
+                local className = CTIEUtils.GetRecordName(Class.tableName, class.classid)
+                writeDebug("EXPORTCLASSES:: SETLOOKUP:: [%s] [%s] [%s]", class.classid, className, Class.tableName)
+                classGuid:SetID(class.classid):SetName(className):SetTableName(Class.tableName)
 
-            -- Use MakeLookupRecord for classid
-            if class.classid and stringIsGuid(class.classid) then
-                classData.classid = CTIEUtils.MakeLookupRecord(Class.tableName, class.classid)
-            end
-            classData.level = class.level or 1
+                dtoClass:SetLevel(class.level)
 
-            local c = sc:GetClass()
-            local f = {}
-            c:FillLevelsUpTo(classData.level, false, "nonprimary", f)
-            writeDebug("EXPORTCLASSES:: CLASS:: %s %s", c, json(c))
-            writeDebug("EXPORTCLASSES:: FILL:: %s", json(f))
-
-            classData.features = {}
-            for _, item in pairs(f) do
-                if next(item.features) then
-                    classData.features = CTIEUtils.MergeTables(classData.features, self:_exportFeatures(item.features))
-                end
-            end
-
-            local subclasses = sc:GetSubclasses()
-            for _, subclass in pairs(subclasses) do
-                f = {}
-                subclass:FillLevelsUpTo(classData.level, false, "nonprimary", f)
-                writeDebug("EXPORTCLASSES:: SUBCLASS:: %s %s", subclass, json(subclass))
-                writeDebug("EXPORTCLASSES:: SUBCLASS:: FILL:: %s", json(f))
-                for _, item in pairs(f) do
-                    if next(item.features) then
-                        classData.features = CTIEUtils.MergeTables(classData.features,
-                            self:_exportFeatures(item.features))
+                local c = codexToon:GetClass()
+                local classFill = {}
+                c:FillLevelsUpTo(dtoClass:GetLevel(), false, "nonprimary", classFill)
+                writeDebug("EXPORTCLASSES:: CLASS:: %s %s", c, json(c))
+                writeDebug("EXPORTCLASSES:: FILL:: %s", json(classFill))
+                if classFill then
+                    for _, levelFill in pairs(classFill) do
+                        self:_exportSelectedFeatures(levelFill.features, dtoClass:SelectedFeatures())
                     end
                 end
-            end
 
-            table.insert(classes, classData)
+                local subclasses = codexToon:GetSubclasses()
+                local _, subclass = next(subclasses)
+                if subclass then
+                    classFill = {}
+                    subclass:FillLevelsUpTo(dtoClass:GetLevel(), false, "nonprimary", classFill)
+                    writeDebug("EXPORTCLASS:: SUBCLASS:: %s %s", subclass, json(subclass))
+                    writeDebug("EXPORTCLASS:: SUBCLASS:: FILL:: %s", json(classFill))
+                    if classFill then
+                        for _, levelFill in pairs(classFill) do
+                            self:_exportSelectedFeatures(levelFill.features, dtoClass:SelectedFeatures())
+                        end
+                    end
+                end
+
+            end
         end
     end
 
-    dc:SetClasses(classes)
-    writeDebug("EXPORTCLASSES:: %s", json(dc:GetClasses()))
+    writeDebug("EXPORTCLASSES:: %s", json(dtoClass))
 end
 
 --- Exports character culture information including aspects and language choices.

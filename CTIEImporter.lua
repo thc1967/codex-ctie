@@ -148,6 +148,13 @@ function CTIEImporter:_importCharacter()
 
     local dto, codexToon = self:__getSourceDestCharacterAliases()
 
+    -- self:_importAncestry()
+    self:_importCareer()
+    -- self:_importCulture()
+    self:_importClass()
+    -- self:_importAttributeBuild()
+    -- self:_importAttributes()
+
     -- Lookup table values
     writeLog("Simple Lookup import starting.", STATUS.INFO, 1)
     for propName, config in pairs(CTIEConfig.character.lookupRecords) do
@@ -156,7 +163,7 @@ function CTIEImporter:_importCharacter()
         if r then
             local guid = CTIEUtils.ResolveLookupRecord(config.tableName, r.name, r.guid)
             if guid then
-                writeLog(string.format("Adding [%s].", propName), STATUS.IMPL)
+                writeLog(string.format("Adding [%s]->[%s].", propName, r.name), STATUS.IMPL)
                 local v = codexToon:get_or_add(propName, guid)
                 v = guid
             end
@@ -183,13 +190,6 @@ function CTIEImporter:_importCharacter()
         end
     end
     writeLog("Verbatim property import complete.", STATUS.INFO, -1)
-
-    -- self:_importAncestry()
-    self:_importCareer()
-    -- self:_importCulture()
-    -- self:_importClasses()
-    -- self:_importAttributeBuild()
-    -- self:_importAttributes()
 
     writeLog("Character Import complete.", STATUS.INFO, -1)
 end
@@ -273,37 +273,64 @@ function CTIEImporter:_importCareer()
     careerImporter:Import()
 end
 
+--- Processes class features for a given class or subclass object.
+--- @param classObject table The class or subclass object to process
+--- @param selectedFeatures CTIESelectedFeaturesDTO The selected features to import
+--- @param level number The level to fill up to
+--- @param codexToon table The destination character object
+--- @private
+function CTIEImporter:_processClassFeatures(classObject, selectedFeatures, level, codexToon)
+    local classFill = {}
+    classObject:FillLevelsUpTo(level, false, "nonprimary", classFill)
+    
+    if classFill then
+        for _, levelFill in pairs(classFill) do
+            local levelChoices = CTIELevelChoiceImporter:new(selectedFeatures, levelFill.features)
+            if next(levelChoices) then
+                local lc = codexToon:GetLevelChoices()
+                CTIEUtils.MergeTables(lc, levelChoices)
+            end
+        end
+    end
+end
+
 --- Imports character class information including levels and class-based feature choices.
 --- Resolves class lookup records, creates class entries with appropriate levels, and applies
 --- class feature choices through the level choice system for both main classes and subclasses.
 --- @private
-function CTIEImporter:_importClasses()
-    writeDebug("IMPORTCLASSES::")
+function CTIEImporter:_importClass()
+    writeDebug("IMPORTCLASS::")
     writeLog("Class starting.", STATUS.INFO, 1)
 
-    local sc, dc = self:__getSourceDestCharacterAliases()
-    local sourceClasses = sc:GetClasses()
+    local dto, codexToon = self:__getSourceDestCharacterAliases()
+    local dtoClass = dto:Class()
 
-    if sourceClasses then
-        for _, classInfo in ipairs(sourceClasses) do
-            local classGuid = CTIEUtils.ResolveLookupRecord(Class.tableName, classInfo.classid.name, classInfo.classid.guid)
-            if classGuid and #classGuid then
-                writeDebug("IMPORTCLASSES:: ADD:: %s %s %d", classGuid, classInfo.classid.name or "nil", classInfo.level or 1)
-                writeLog(string.format("Adding Class [%s]", classInfo.classid.name), STATUS.IMPL)
-                local classes = dc:get_or_add("classes", {})
-                table.insert(classes, {classid = classGuid, level = classInfo.level or 1})
+    if dtoClass then
+        local classGuid = CTIEUtils.ResolveLookupRecord(Class.tableName, dtoClass:GuidLookup():GetName(), dtoClass:GuidLookup():GetID())
+        if classGuid and #classGuid then
+            writeDebug("IMPORTCLASS:: ADD:: %s %s %d", classGuid, dtoClass:GuidLookup():GetName() or "nil", dtoClass:GetLevel())
+            writeLog(string.format("Adding Class [%s]", dtoClass:GuidLookup():GetName()), STATUS.IMPL)
+            local classes = codexToon:get_or_add("classes", {})
+            table.insert(classes, {classid = classGuid, level = dtoClass:GetLevel() or 1})
 
-                writeDebug("IMPORTCLASSES:: CLASSINFO:: %s", json(classInfo))
-                if classInfo.features then
-                    local lcImporter = CTIELevelChoiceImporter:new(dc)
-                    lcImporter:Import(classInfo.features)
+            -- Process selected features
+            local selectedFeatures = dtoClass:SelectedFeatures()
+            if selectedFeatures then
+                local classInfo = codexToon:GetClass()
+                self:_processClassFeatures(classInfo, selectedFeatures, dtoClass:GetLevel(), codexToon)
+
+                -- Process selected subclass features
+                local subclasses = codexToon:GetSubclasses()
+                local _, subclass = next(subclasses)
+                if subclass then
+                    self:_processClassFeatures(subclass, selectedFeatures, dtoClass:GetLevel(), codexToon)
                 end
             end
         end
     end
 
     writeLog("Class complete.", STATUS.INFO, -1)
-    writeDebug("IMPORTCLASSES:: COMPLETE:: %s", json(dc:try_get("classes")))
+    writeDebug("IMPORTCLASS:: COMPLETE:: %s", json(codexToon:try_get("classes")))
 end
 
 --- Imports character culture information including aspects and culture-based features.

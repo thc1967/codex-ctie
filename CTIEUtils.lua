@@ -26,14 +26,17 @@ local TABLE_NAME_CHOICE_TYPE_MAP = {
     [Skill.tableName] = "CharacterSkillChoice",
 }
 
-local CHOICE_TYPE_TO_TABLE_NAME_MAP = {
-    ["CharacterFeatChoice"] = CharacterFeat.tableName,
-    ["CharacterLanguageChoice"] = Language.tableName,
-    ["CharacterSkillChoice"] = Skill.tableName,
-}
-
 --- Marker used in lookup records to identify features that exist in option lists rather than database tables
 CTIEUtils.FEATURE_TABLE_MARKER = "::FEATURE::"
+
+local CHOICE_TYPE_TO_TABLE_NAME_MAP = {
+    ["CharacterDeityChoice"] = Deity.tableName,
+    ["CharacterFeatChoice"] = CharacterFeat.tableName,
+    ["CharacterFeatureChoice"] = CTIEUtils.FEATURE_TABLE_MARKER,
+    ["CharacterLanguageChoice"] = Language.tableName,
+    ["CharacterSkillChoice"] = Skill.tableName,
+    ["CharacterSubclassChoice"] = "subclasses",
+}
 
 --- Sets the debug mode state.
 --- @param v boolean The debug mode state to set
