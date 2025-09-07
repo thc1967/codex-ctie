@@ -1,4 +1,5 @@
 local writeDebug = CTIEUtils.writeDebug
+local fileLogger = CTIEUtils.FileLogger
 
 --- Imports selected features back into levelChoices format for Codex character data.
 --- Matches selected features against available feature definitions and resolves GUIDs.
@@ -15,7 +16,7 @@ CTIELevelChoiceImporter.__index = CTIELevelChoiceImporter
 --- @return table levelChoices The levelChoices structure with feature GUIDs as keys
 function CTIELevelChoiceImporter:new(selectedFeaturesDTO, availableFeatures)
     writeDebug("LEVELCHOICEIMPORTER:: NEW:: %s", json(availableFeatures))
-    
+
     local instance = setmetatable({}, self)
     instance.selectedFeaturesDTO = selectedFeaturesDTO
     instance.availableFeatures = availableFeatures or {}
@@ -28,24 +29,25 @@ end
 --- Processes all selected features and builds the levelChoices structure.
 --- @private
 function CTIELevelChoiceImporter:_processSelectedFeatures()
+    fileLogger("import"):Log("LEVELCHOICEIMPORTER:: PROCESSSELECTEDFEATURES::"):Indent()
     local allFeatures = self.selectedFeaturesDTO:GetAllFeatures()
 
     for _, selectedFeature in pairs(allFeatures) do
         local choiceId = selectedFeature:GetChoiceId()
-        
+
         -- Special handling for deity domain choices (artificial "-domains" entries)
         if choiceId and choiceId:match("%-domains$") then
             writeDebug("LEVELCHOICEIMPORTER:: Processing deity domains: %s", choiceId)
             local selectionGuids = {}
             local selections = selectedFeature:GetSelections()
-            
+
             for _, selection in pairs(selections) do
                 local resolvedGuid = CTIEUtils.ResolveLookupRecord(selection:GetTableName(), selection:GetName(), selection:GetID())
                 if resolvedGuid then
                     table.insert(selectionGuids, resolvedGuid)
                 end
             end
-            
+
             if #selectionGuids > 0 then
                 self.levelChoices[choiceId] = selectionGuids
                 writeDebug("LEVELCHOICEIMPORTER:: Added %d domain selections for %s", #selectionGuids, choiceId)
@@ -59,6 +61,8 @@ function CTIELevelChoiceImporter:_processSelectedFeatures()
             end
         end
     end
+
+    fileLogger("import"):Outdent():Log("LEVELCHOICEIMPORTER:: PROCESSSELECTEDFEATURES:: COMPLETE")
 end
 
 --- Recursively searches for a feature that matches the selected feature.
@@ -67,25 +71,25 @@ end
 --- @return table|nil matchedFeature The matching feature or nil if not found
 --- @private
 function CTIELevelChoiceImporter:_findMatchingFeature(selectedFeature, featureList)
-    writeDebug("LEVELCHOICEIMPORTER:: FINDMATCHINGFEATURE:: %s", selectedFeature:GetChoiceType())
+
+    local selectedGuid = selectedFeature:GetChoiceId()
 
     for _, feature in pairs(featureList) do
         -- Rule 1: Direct choiceId match
-        writeDebug("LEVELCHOICEIMPORTER:: FINDMATCHINGFEATURE:: RULE1:: [%s] [%s]", selectedFeature:GetChoiceId(), feature.guid)
-        if selectedFeature:GetChoiceId() and feature.guid == selectedFeature:GetChoiceId() then
-            writeDebug("LEVELCHOICEIMPORTER:: FINDMATCHINGFEATURE:: MATCH!")
-            return feature
-        end
-
-        -- Rule 2 & 3: choiceType matches typeName and categories check
-        if self:_choiceTypeMatches(selectedFeature:GetChoiceType(), feature.typeName) then
-            if self:_categoriesMatch(selectedFeature:GetCategories(), feature:try_get("categories")) then
+        if selectedGuid then
+            if  feature.guid == selectedGuid then
                 return feature
+            end
+        else
+            -- Rule 2 & 3: If we don't have a GUID in our source; choiceType matches typeName and categories check
+            if self:_choiceTypeMatches(selectedFeature:GetChoiceType(), feature.typeName) then
+                if self:_categoriesMatch(selectedFeature:GetCategories(), feature:try_get("categories")) then
+                    return feature
+                end
             end
         end
 
         -- Recursively search nested features
-        writeDebug("LEVELCHOICEIMPORTER:: FEATURES?:: %s", feature.name)
         local features = feature:try_get("features")
         if features then
             local nestedMatch = self:_findMatchingFeature(selectedFeature, features)
@@ -152,6 +156,7 @@ function CTIELevelChoiceImporter:_addToLevelChoices(featureGuid, selectedFeature
     local selections = selectedFeature:GetSelections()
 
     for _, selection in pairs(selections) do
+        writeDebug("LEVELCHOICEIMPORTER::ADDTOLEVELCHOICES:: %s", selection:GetName())
         local resolvedGuid = self:_resolveSelectionGuid(selection, matchedFeature)
         if resolvedGuid then
             table.insert(selectionGuids, resolvedGuid)

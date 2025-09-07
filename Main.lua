@@ -113,17 +113,10 @@ import.Register {
     text = function(_, text)
         local dto = CTIECodexDTO:new()
         if dto:FromJSON(text) then
+            CTIEUtils.FileLogger("import"):Log("IMPORT:: START::")
             local importer = CTIEImporter:new(dto)
             importer:Import()
+            CTIEUtils.FileLogger("import"):Log("IMPORT:: COMPLETE::")
         end
-
-        -- local characterData = CTIECharacterData:new()
-
-        -- if characterData:FromJSON(text) then
-        --     local ctieImporter = CTIEImporter:new(characterData)
-        --     ctieImporter:Import()
-        -- else
-        --     writeLog("!!!! Invalid import file format!", CTIEUtils.STATUS.ERROR)
-        -- end
     end
 }

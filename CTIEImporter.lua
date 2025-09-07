@@ -22,7 +22,7 @@ CTIEImporter.__index = CTIEImporter
 
 local writeDebug = CTIEUtils.writeDebug
 local writeLog = CTIEUtils.writeLog
-local stringIsGuid = CTIEUtils.StringIsGuid
+local fileLogger = CTIEUtils.FileLogger
 local STATUS = CTIEUtils.STATUS
 
 --- Creates a new CTIEImporter instance with pre-populated character data.
@@ -282,8 +282,10 @@ end
 function CTIEImporter:_processClassFeatures(classObject, selectedFeatures, level, codexToon)
     local classFill = {}
     classObject:FillLevelsUpTo(level, false, "nonprimary", classFill)
-    
+
     if classFill then
+        fileLogger("import"):Log("PROCESSCLASSFEATURES:: SELECTED::\n%s", json(selectedFeatures))
+        fileLogger("import"):Log("PROCESSCLASSFEATURES:: CLASSFILL::\n%s", json(classFill))
         for _, levelFill in pairs(classFill) do
             local levelChoices = CTIELevelChoiceImporter:new(selectedFeatures, levelFill.features)
             if next(levelChoices) then
@@ -300,6 +302,7 @@ end
 --- @private
 function CTIEImporter:_importClass()
     writeDebug("IMPORTCLASS::")
+    fileLogger("import"):Log("IMPORTCLASS::"):Indent()
     writeLog("Class starting.", STATUS.INFO, 1)
 
     local dto, codexToon = self:__getSourceDestCharacterAliases()
@@ -317,19 +320,33 @@ function CTIEImporter:_importClass()
             local selectedFeatures = dtoClass:SelectedFeatures()
             if selectedFeatures then
                 local classInfo = codexToon:GetClass()
+                fileLogger("import"):Log("PROCESSFEATURES:: CLASS::"):Indent()
                 self:_processClassFeatures(classInfo, selectedFeatures, dtoClass:GetLevel(), codexToon)
+                fileLogger("import"):Outdent():Log("PROCESSFEATURES:: CLASS:: COMPLETE::")
 
                 -- Process selected subclass features
                 local subclasses = codexToon:GetSubclasses()
                 local _, subclass = next(subclasses)
                 if subclass then
+                    fileLogger("import"):Log("PROCESSFEATURES:: SUBCLASS::"):Indent()
                     self:_processClassFeatures(subclass, selectedFeatures, dtoClass:GetLevel(), codexToon)
+                    fileLogger("import"):Outdent():Log("PROCESSFEATURES:: SUBCLASS:: COMPLETE::")
                 end
             end
+
+            -- Process domains, if any
+            local domains = codexToon:GetDomains()
+            writeDebug("IMPORTCLASS:: DOMAINS:: %s", json(domains))
+            -- if domains and next(domains) then
+            --     for _, deityDomain in pairs(domains) do
+            --         self:_processClassFeatures(deityDomain, selectedFeatures, dtoClass:GetLevel(), codexToon)
+            --     end
+            -- end
         end
     end
 
     writeLog("Class complete.", STATUS.INFO, -1)
+    fileLogger("import"):Outdent():Log("IMPORTCLASS:: COMPLETE::")
     writeDebug("IMPORTCLASS:: COMPLETE:: %s", json(codexToon:try_get("classes")))
 end
 

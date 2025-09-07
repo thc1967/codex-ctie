@@ -21,6 +21,9 @@ CTIEUtils.__index = CTIEUtils
 local CTIE_DEBUG = true
 local CTIE_VERBOSE = true
 
+--- Static storage for file logger instances, keyed by fileName
+CTIEUtils._fileLoggers = {}
+
 local TABLE_NAME_CHOICE_TYPE_MAP = {
     [Language.tableName] = "CharacterLanguageChoice",
     [Skill.tableName] = "CharacterSkillChoice",
@@ -411,4 +414,22 @@ function CTIEUtils.AppendTable(t, k, v)
     t[k] = t[k] or {}
     table.insert(t[k], v)
     return t
+end
+
+--- Gets or creates a file logger instance for the specified fileName.
+--- Manages a static cache of logger instances to ensure single logger per file.
+--- @param fileName string|nil The file name for the logger (defaults to "CTIE" if blank)
+--- @return CTIEFileLog logger The file logger instance for the specified file
+function CTIEUtils.FileLogger(fileName)
+    if not fileName or #fileName == 0 then
+        fileName = "CTIE"
+    end
+    
+    fileName = string.lower(fileName)
+    
+    if not CTIEUtils._fileLoggers[fileName] then
+        CTIEUtils._fileLoggers[fileName] = CTIEFileLog:new(fileName)
+    end
+    
+    return CTIEUtils._fileLoggers[fileName]
 end
