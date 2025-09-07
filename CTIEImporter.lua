@@ -161,11 +161,11 @@ function CTIEImporter:_importCharacter()
     for propName, config in pairs(CTIEConfig.character.lookupRecords) do
         local r = dto:_getProp(propName)
         writeDebug("IMPORTCHARACTER:: SIMPLELOOKUP:: %s -> %s", propName, json(r))
-        if r and (r:try_get("name") or r:try_get("guid")) then
+        if r and (r.name or r.guid) then
             local guid = CTIEUtils.ResolveLookupRecord(config.tableName, r.name, r.guid)
             if guid then
-                writeLog(string.format("Adding [%s]->[%s].", propName, r.name), STATUS.IMPL)
-                local v = codexToon:get_or_add(propName, guid)
+                writeLog(string.format("Adding [%s]->[%s].", config.property, r.name), STATUS.IMPL)
+                local v = codexToon:get_or_add(config.property, guid)
                 v = guid
             end
         end
