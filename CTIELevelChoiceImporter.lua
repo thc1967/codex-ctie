@@ -31,11 +31,32 @@ function CTIELevelChoiceImporter:_processSelectedFeatures()
     local allFeatures = self.selectedFeaturesDTO:GetAllFeatures()
 
     for _, selectedFeature in pairs(allFeatures) do
-        local matchedFeature = self:_findMatchingFeature(selectedFeature, self.availableFeatures)
-        if matchedFeature then
-            self:_addToLevelChoices(matchedFeature.guid, selectedFeature, matchedFeature)
+        local choiceId = selectedFeature:GetChoiceId()
+        
+        -- Special handling for deity domain choices (artificial "-domains" entries)
+        if choiceId and choiceId:match("%-domains$") then
+            writeDebug("LEVELCHOICEIMPORTER:: Processing deity domains: %s", choiceId)
+            local selectionGuids = {}
+            local selections = selectedFeature:GetSelections()
+            
+            for _, selection in pairs(selections) do
+                local resolvedGuid = CTIEUtils.ResolveLookupRecord(selection:GetTableName(), selection:GetName(), selection:GetID())
+                if resolvedGuid then
+                    table.insert(selectionGuids, resolvedGuid)
+                end
+            end
+            
+            if #selectionGuids > 0 then
+                self.levelChoices[choiceId] = selectionGuids
+                writeDebug("LEVELCHOICEIMPORTER:: Added %d domain selections for %s", #selectionGuids, choiceId)
+            end
         else
-            writeDebug("LEVELCHOICEIMPORTER:: No match found for choiceId: %s", selectedFeature:GetChoiceId() or "nil")
+            local matchedFeature = self:_findMatchingFeature(selectedFeature, self.availableFeatures)
+            if matchedFeature then
+                self:_addToLevelChoices(matchedFeature.guid, selectedFeature, matchedFeature)
+            else
+                writeDebug("LEVELCHOICEIMPORTER:: No match found for choiceId: %s", selectedFeature:GetChoiceId() or "nil")
+            end
         end
     end
 end

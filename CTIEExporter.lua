@@ -244,6 +244,34 @@ function CTIEExporter:_exportFeatures(features)
 
             -- Store with guid as key
             result[feature.guid] = entry
+
+            -- Special handling for deity domain choices - create separate entry
+            if feature.typeName == "CharacterDeityChoice" then
+                local domainGuid = feature.guid .. "-domains"
+                if codexToon.levelChoices[domainGuid] then
+                    writeDebug("EXPORTFEATURES:: DEITY DOMAINS:: %s", domainGuid)
+
+                    local domainSelections = {}
+                    for _, choiceGuid in pairs(codexToon.levelChoices[domainGuid]) do
+                        if type(choiceGuid) == "string" then
+                            local domainSelection = {
+                                guid = choiceGuid,
+                                tableName = DeityDomain.tableName,
+                                name = CTIEUtils.GetRecordName(DeityDomain.tableName, choiceGuid)
+                            }
+                            table.insert(domainSelections, domainSelection)
+                        end
+                    end
+
+                    if #domainSelections > 0 then
+                        result[domainGuid] = {
+                            choiceType = "CharacterDeityDomainChoice", -- or whatever the actual type name is
+                            source = feature:try_get("source") or "",
+                            selections = domainSelections
+                        }
+                    end
+                end
+            end
         end
 
         -- Recursively process nested features, merging into flat result
