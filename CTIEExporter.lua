@@ -89,8 +89,8 @@ function CTIEExporter:_exportCharacter()
         end
     end
 
-    -- self:_exportAncestry()
-    -- self:_exportAttributes()
+    self:_exportAncestry()
+    self:_exportAttributes()
     self:_exportCareer()
     self:_exportClass()
     -- self:_exportCulture()
@@ -103,20 +103,25 @@ end
 --- @private
 function CTIEExporter:_exportAncestry()
     writeDebug("EXPORTANCESTRY::")
-    local sc, dc = self:__getSourceDestCharacterAliases()
-    local a = {
-        features = {},
-    }
+    local codexToon, dto = self:__getSourceDestCharacterAliases()
 
-    local r = sc:Race()
-    if r then
-        writeDebug("EXPORTANCESTRY:: RACE:: %s, %s, %s", r, sc:RaceID(), json(r))
-        a.raceid = CTIEUtils.CreateLookupRecord(Race.tableName, r.id, r.name)
-        a.features = self:_exportFeatures(r.modifierInfo.features)
+    local raceItem = codexToon:Race()
+    if raceItem then
+        writeDebug("EXPORTANCESTRY:: RACE:: %s, %s, %s", raceItem, codexToon:RaceID(), json(raceItem))
+        local ancestry = dto:Ancestry()
+        local raceId = ancestry:GuidLookup()
+        raceId:SetTableName(Race.tableName):SetID(codexToon:RaceID()):SetName(raceItem.name)
+
+        -- Set features
+        local raceFill = raceItem:GetClassLevel()
+        writeDebug("EXPORTANCESTRY:: RACEFILL:: %s", json(raceFill))
+        if raceFill.features then
+            self:_exportSelectedFeatures(raceFill.features, ancestry:SelectedFeatures())
+        end
+
     end
 
-    dc:SetAncestry(a)
-    writeDebug("EXPORTANCESTRY:: %s", json(a))
+    writeDebug("EXPORTANCESTRY:: %s", json(dto:Ancestry()))
 end
 
 --- Exports character attribute values and identifiers.
@@ -124,7 +129,16 @@ end
 --- as defined in CTIEConfig.attributes, preserving original attribute structure.
 --- @private
 function CTIEExporter:_exportAttributes()
-    self.characterData:SetAttributes(self.sourceToken.properties.attributes)
+    local codexToon, dto = self:__getSourceDestCharacterAliases()
+    local sourceAttributes = codexToon.attributes or {}
+    local attributesDTO = dto:Attributes()
+
+    for _, attributeKey in ipairs(CTIEConfig.attributes) do
+        local sourceAttr = sourceAttributes[attributeKey]
+        if sourceAttr and sourceAttr.baseValue then
+            attributesDTO:SetAttribute(attributeKey, sourceAttr.baseValue)
+        end
+    end
 end
 
 --- Exports character career and background information.

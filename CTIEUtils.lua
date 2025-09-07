@@ -433,3 +433,17 @@ function CTIEUtils.FileLogger(fileName)
     
     return CTIEUtils._fileLoggers[fileName]
 end
+
+--- Creates a formatted summary string of attribute values for display or logging.
+--- Iterates through configured attributes and formats each with its abbreviation and base value.
+--- @param attributes table The attributes table containing attribute objects with baseValue fields
+--- @return string summary Formatted attribute summary (e.g., "M +2 A +1 I +3 P +0 R +1")
+function CTIEUtils.SummarizeAttributes(attributes)
+    local summary = ""
+    for _, attr in ipairs(CTIEConfig.attributes) do
+        if attributes[attr] and attributes[attr].baseValue then
+            summary = string.format("%s %s %+d ", summary, attr:sub(1,1):upper(), attributes[attr].baseValue)
+        end
+    end
+    return summary:trim()
+end

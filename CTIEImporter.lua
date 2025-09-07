@@ -148,12 +148,12 @@ function CTIEImporter:_importCharacter()
 
     local dto, codexToon = self:__getSourceDestCharacterAliases()
 
-    -- self:_importAncestry()
+    self:_importAncestry()
     self:_importCareer()
     -- self:_importCulture()
     self:_importClass()
-    -- self:_importAttributeBuild()
-    -- self:_importAttributes()
+    self:_importAttributeBuild()
+    self:_importAttributes()
 
     -- Lookup table values
     writeLog("Simple Lookup import starting.", STATUS.INFO, 1)
@@ -200,32 +200,39 @@ end
 --- @private
 function CTIEImporter:_importAncestry()
 
-    local sc, dc = self:__getSourceDestCharacterAliases()
+    local dto, codexToon = self:__getSourceDestCharacterAliases()
+    local dtoAncestry = dto:Ancestry()
 
-    writeDebug("IMPORTANCESTRY:: START:: %s", json(sc:GetAncestry()))
+    writeDebug("IMPORTANCESTRY:: START:: %s", json(dtoAncestry))
     writeLog("Ancestry starting.", STATUS.INFO, 1)
 
-    local ancestry = sc:GetAncestry()
-    if ancestry and ancestry.raceid then
-        local guid = CTIEUtils.ResolveLookupRecord(Race.tableName, ancestry.raceid.name, ancestry.raceid.guid)
-        if guid then
-            writeLog(string.format("Adding ancestry %s.", ancestry.raceid.name), STATUS.IMPL)
-            local r = dc:get_or_add("raceid", guid)
-            r = guid
+    if dtoAncestry then
+        local raceGuid = CTIEUtils.ResolveLookupRecord(Race.tableName, dtoAncestry:GuidLookup():GetName(), dtoAncestry:GuidLookup():GetID())
+        if raceGuid and #raceGuid then
+            writeDebug("IMPORTANCESTRY:: ADD:: %s %s", raceGuid, dtoAncestry:GuidLookup():GetName() or "nil")
+            writeLog(string.format("Adding Ancestry [%s]", dtoAncestry:GuidLookup():GetName()), STATUS.IMPL)
+            local r = codexToon:get_or_add("raceid", raceGuid)
+            r = raceGuid
 
-            local lcImporter = CTIELevelChoiceImporter:new(dc)
-            local raceFill = dc:Race():GetClassLevel().features
-            if ancestry.features then
-                lcImporter:Import(ancestry.features, raceFill)
-            end
-            if ancestry.unkeyedFeatures then
-                lcImporter:ImportUnkeyed(ancestry.unkeyedFeatures, raceFill)
+            -- Process selected features
+            local selectedFeatures = dtoAncestry:SelectedFeatures()
+            if selectedFeatures then
+                local raceInfo = codexToon:Race()
+                local raceFill = raceInfo:GetClassLevel()
+                if raceFill and raceFill.features then
+                    local levelChoices = CTIELevelChoiceImporter:new(selectedFeatures, raceFill.features)
+                    writeDebug("IMPORTANCESTRY:: LEVELCHOICES:: %s", json(levelChoices))
+                    if next(levelChoices) then
+                        local lc = codexToon:GetLevelChoices()
+                        CTIEUtils.MergeTables(lc, levelChoices)
+                    end
+                end
             end
         end
     end
 
     writeLog("Ancestry complete.", STATUS.INFO, -1)
-    writeDebug("IMPORTANCESTRY:: COMPLETE:: %s", dc:try_get("raceid"))
+    writeDebug("IMPORTANCESTRY:: COMPLETE:: %s", codexToon:try_get("raceid"))
 end
 
 --- Imports character attribute build configuration data.
@@ -233,14 +240,15 @@ end
 --- preserving the original character's attribute configuration methodology.
 --- @private
 function CTIEImporter:_importAttributeBuild()
-    local sab = self.characterData:GetCharacterProperty("attributeBuild") or {}
-    local dab = self.c:get_or_add("attributeBuild", {})
+    local dto, codexToon = self:__getSourceDestCharacterAliases()
+    local sab = dto:AttributeBuild()
+    local dab = codexToon:get_or_add("attributeBuild", {})
 
     for k, v in pairs(sab) do
         dab[k] = v
     end
 
-    writeDebug("IMPORTATTRIBUTEBUILD:: %s", json(self.c.attributeBuild))
+    writeDebug("IMPORTATTRIBUTEBUILD:: %s", json(codexToon.attributeBuild))
 end
 
 --- Imports character attribute base values for all standard attributes.
@@ -248,19 +256,19 @@ end
 --- as defined in the exported character data, with logging of the final attribute spread.
 --- @private
 function CTIEImporter:_importAttributes()
-    local sc = self.characterData
-    local sourceAttributes = sc:GetAttributes()
-    local destinationAttributes = self.c:get_or_add("attributes", {})
+    local dto, codexToon = self:__getSourceDestCharacterAliases()
+    local sourceAttributes = dto:Attributes()
+    local destinationAttributes = codexToon:get_or_add("attributes", {})
 
     for _, attr in ipairs(CTIEConfig.attributes) do
-        if sourceAttributes[attr] then
-            destinationAttributes[attr].baseValue = sourceAttributes[attr].baseValue
+        if sourceAttributes:GetAttribute(attr) then
+            destinationAttributes[attr].baseValue = sourceAttributes:GetAttribute(attr)
         end
     end
 
-    writeLog(string.format("Setting Attributes [%s].", sc:GetAttributesSummary()), STATUS.IMPL)
+    writeLog(string.format("Setting Attributes [%s].", CTIEUtils.SummarizeAttributes(codexToon.attributes)), STATUS.IMPL)
 
-    writeDebug("IMPORTATTRIBUTES:: %s", json(self.c.attributes))
+    writeDebug("IMPORTATTRIBUTES:: %s", json(codexToon.attributes))
 end
 
 --- Imports character career and background information.
@@ -268,7 +276,6 @@ end
 --- inciting incident matching, and career-related feature choice restoration.
 --- @private
 function CTIEImporter:_importCareer()
-    local sc, dc = self:__getSourceDestCharacterAliases() --TODO:
     local careerImporter = CTIECareerImporter:new(self:__getSourceDestCharacterAliases())
     careerImporter:Import()
 end
@@ -284,8 +291,6 @@ function CTIEImporter:_processClassFeatures(classObject, selectedFeatures, level
     classObject:FillLevelsUpTo(level, false, "nonprimary", classFill)
 
     if classFill then
-        fileLogger("import"):Log("PROCESSCLASSFEATURES:: SELECTED::\n%s", json(selectedFeatures))
-        fileLogger("import"):Log("PROCESSCLASSFEATURES:: CLASSFILL::\n%s", json(classFill))
         for _, levelFill in pairs(classFill) do
             local levelChoices = CTIELevelChoiceImporter:new(selectedFeatures, levelFill.features)
             if next(levelChoices) then
