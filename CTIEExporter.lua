@@ -93,7 +93,7 @@ function CTIEExporter:_exportCharacter()
     self:_exportAttributes()
     self:_exportCareer()
     self:_exportClass()
-    -- self:_exportCulture()
+    self:_exportCulture()
     -- TODO: Kits
 end
 
@@ -362,101 +362,52 @@ end
 --- and handles special culture language choice selections through the level choice system.
 --- @private
 function CTIEExporter:_exportCulture()
-    local sc, dc = self:__getSourceDestCharacterAliases()
-    local culture = {
-        aspects = {},
-    }
-    writeDebug("EXPORTCULTURE:: START:: %s", json(sc.culture))
+    local codexToon, dto = self:__getSourceDestCharacterAliases()
+    local codexCulture = codexToon:try_get("culture")
+    writeDebug("EXPORTCULTURE:: START:: %s", json(codexCulture))
 
-    local function exportCultureAspect(aspectName)
-        if stringIsGuid(sc.culture.aspects[aspectName]) then
-            culture.aspects[aspectName] = CTIEUtils.MakeLookupRecord(CultureAspect.tableName,
-                sc.culture.aspects[aspectName])
+    local function exportCultureAspect(codexAspect, dtoAspect)
+        writeDebug("EXPORTCULTURE:: ASPECT:: [%s]", codexAspect)
+        if stringIsGuid(codexAspect) then
+            local name = CTIEUtils.GetRecordName(CultureAspect.tableName, codexAspect)
+            dtoAspect:GuidLookup():SetTableName(CultureAspect.tableName):SetID(codexAspect):SetName(name)
 
-            local caItem = dmhub.GetTable(CultureAspect.tableName)[sc.culture.aspects[aspectName]]
+            local caItem = dmhub.GetTable(CultureAspect.tableName)[codexAspect]
             if caItem then
                 writeDebug("EXPORTCULTURE:: CULTUREASPECT:: %s %s", caItem, json(caItem))
-                local fill = caItem:GetClassLevel();
-                writeDebug("EXPORTCULTURE:: CULTUREASPECT:: FILL:: %s", json(fill))
-                culture.aspects[aspectName].features = self:_exportFeatures(caItem:GetClassLevel().features)
+                local aspectFill = caItem:GetClassLevel();
+                writeDebug("EXPORTCULTURE:: CULTUREASPECT:: FILL:: %s", json(aspectFill))
+                self:_exportSelectedFeatures(aspectFill.features, dtoAspect:SelectedFeatures())
             end
         end
     end
 
-    if sc.levelChoices and sc.levelChoices.cultureLanguageChoice then
-        culture.features = {
-            cultureLanguageChoice = { CTIEUtils.MakeLookupRecord(Language.tableName, sc.levelChoices.cultureLanguageChoice[1]) }
-        }
-    end
-
-    if sc.culture and type(sc.culture) == "table" and sc.culture.aspects and type(sc.culture.aspects) == "table" then
-        exportCultureAspect("environment")
-        exportCultureAspect("organization")
-        exportCultureAspect("upbringing")
-    end
-
-    dc:SetCulture(culture)
-
-    writeDebug("EXPORTCULTURE:: END:: %s", json(dc:GetCulture()))
-end
-
---- Recursively exports feature data and choice selections across all feature types.
---- Handles feature choices by type (skills, languages, deities, feats, etc.), processes nested features,
---- and manages special cases like deity domain selections. Supports recursive processing for complex feature hierarchies.
---- @private
---- @param featureList table The list of features to process and export
---- @return table features The exported feature data organized by feature GUID
-function CTIEExporter:_exportFeaturesOld(featureList)
-    writeDebug("EXPORTFEATURES:: START:: %s", json(featureList))
-
-    local sc, _ = self:__getSourceDestCharacterAliases()
-    local features = {}
-
-    for _, feature in pairs(featureList) do
-        writeDebug("EXPORTFEATURES:: FEATURE:: %s %s", feature.typeName, json(feature))
-
-        local typeName = feature.typeName:lower()
-        if typeName:sub(-6) == "choice" then
-            if sc.levelChoices[feature.guid] then
-                local selections = {}
-                -- Find it in the choices list
-                for _, item in pairs(sc.levelChoices[feature.guid]) do
-                    local selection = {}
-                    if typeName:find("skill") then
-                        selection = CTIEUtils.MakeLookupRecord(Skill.tableName, item)
-                    elseif typeName:find("language") then
-                        selection = CTIEUtils.MakeLookupRecord(Language.tableName, item)
-                    elseif typeName:find("subclass") then
-                        selection = CTIEUtils.MakeLookupRecord("subclasses", item)
-                    elseif typeName:find("deity") then
-                        selection = CTIEUtils.MakeLookupRecord(Deity.tableName, item)
-                        if next(selection) then
-                            self:_addDeityDomains(feature.guid, sc, features) -- Pass features instead of selections
-                        end
-                    elseif typeName:find("feature") then
-                        selection = CTIEUtils.MakeFeatureRecord(feature.options, item)
-                    elseif typeName:find("feat") then
-                        selection = CTIEUtils.MakeLookupRecord(CharacterFeat.tableName, item)
-                    end
-                    if next(selection) then table.insert(selections, selection) end
-                end
-
-                if next(selections) then features[feature.guid] = selections end
-            end
-        elseif typeName == "classlevel" or typeName == "characterfeaturelist" then
-            -- Handle nested features
-            if feature:try_get("features") and next(feature.features) then
-                local nestedFeatures = self:_exportFeatures(feature.features)
-                -- Merge nested results into main features table
-                for guid, selections in pairs(nestedFeatures) do
-                    features[guid] = selections
-                end
-            end
+    -- Check for culture language selection
+    local codexCultureLanguage = codexCulture and codexToon.levelChoices and codexToon.levelChoices.cultureLanguageChoice or ""
+    if codexCultureLanguage and #codexCultureLanguage and #codexCultureLanguage[1] then
+        local dtoLanguage = dto:Culture():Language()
+        if dtoLanguage then
+            local name = CTIEUtils.GetRecordName(Language.tableName, codexCultureLanguage[1])
+            dtoLanguage:SetTableName(Language.tableName):SetID(codexCultureLanguage[1]):SetName(name)
         end
     end
 
-    writeDebug("EXPORTFEATURES:: %s", json(features))
-    return features
+    if codexCulture and codexCulture.aspects and #codexCulture.aspects then
+        local codexAspect = codexCulture.aspects["environment"]
+        if codexAspect then
+            exportCultureAspect(codexAspect, dto:Culture():Environment())
+        end
+        codexAspect = codexCulture.aspects["organization"]
+        if codexAspect then
+            exportCultureAspect(codexAspect, dto:Culture():Organization())
+        end
+        codexAspect = codexCulture.aspects["upbringing"]
+        if codexAspect then
+            exportCultureAspect(codexAspect, dto:Culture():Upbringing())
+        end
+    end
+
+    writeDebug("EXPORTCULTURE:: COMPLETE:: %s", json(dto:Culture()))
 end
 
 --- Exports features and populates target DTO with selected feature data.

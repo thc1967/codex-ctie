@@ -150,7 +150,7 @@ function CTIEImporter:_importCharacter()
 
     self:_importAncestry()
     self:_importCareer()
-    -- self:_importCulture()
+    self:_importCulture()
     self:_importClass()
     self:_importAttributeBuild()
     self:_importAttributes()
@@ -361,33 +361,50 @@ end
 --- @private
 function CTIEImporter:_importCulture()
 
-    local sc, dc = self:__getSourceDestCharacterAliases()
-    local culture = sc:GetCulture()
-    local aspects = dc:get_or_add("culture", Culture.CreateNew()).aspects
+    local dto, codexToon = self:__getSourceDestCharacterAliases()
+    local dtoCulture = dto:Culture()
+    local aspects = codexToon:get_or_add("culture", Culture.CreateNew()).aspects
 
-    writeDebug("IMPORTCULTURE:: START:: %s", json(culture and culture.aspects))
+    writeDebug("IMPORTCULTURE:: START:: %s", json(dtoCulture))
     writeLog("Culture starting.", STATUS.INFO, 1)
 
-    if culture and culture.features then
-        local lcImporter = CTIELevelChoiceImporter:new(dc)
-        lcImporter:Import(culture.features)
+    local cultureLanguage = dtoCulture:Language()
+    if cultureLanguage then
+        local resolvedGuid = CTIEUtils.ResolveLookupRecord(Language.tableName, cultureLanguage:GetName(), cultureLanguage:GetID())
+        if resolvedGuid then
+            writeLog(string.format("Adding Culture Language [%s].", cultureLanguage:GetName()), STATUS.IMPL)
+            local levelChoices = codexToon:GetLevelChoices()
+            levelChoices["cultureLanguageChoice"] = { resolvedGuid }
+        end
     end
 
-    if culture and culture.aspects then
-        for aspectName, aspect in pairs(culture.aspects) do
-            writeDebug("IMPORTCULTURE:: ASPECT:: %s %s", aspectName, json(aspect))
-            local aspectGuid = CTIEUtils.ResolveLookupRecord(CultureAspect.tableName, aspect.name, aspect.guid)
-            if aspectGuid and #aspectGuid then
-                writeLog(string.format("Adding Culture Aspect [%s]->[%s].", aspectName, aspect.name), STATUS.IMPL)
-                aspects[aspectName] = aspectGuid
+    -- Process culture aspects
+    local aspectMethods = {
+        environment = dtoCulture:Environment(),
+        organization = dtoCulture:Organization(),
+        upbringing = dtoCulture:Upbringing()
+    }
 
-                local lcImporter = CTIELevelChoiceImporter:new(dc)
-                if aspect.features then
-                    lcImporter:Import(aspect.features)
-                end
-                if aspect.unkeyedFeatures then
-                    local aspectFill = dmhub.GetTable(CultureAspect.tableName)[aspectGuid]:GetClassLevel()
-                    lcImporter:ImportUnkeyed(aspect.unkeyedFeatures, aspectFill.features)
+    for _, aspectName in ipairs(CTIEConfig.cultureAspects) do
+        local aspectDTO = aspectMethods[aspectName]
+        if aspectDTO then
+            local aspectLookup = aspectDTO:GuidLookup()
+            if aspectLookup and aspectLookup:GetName() then
+                local aspectGuid = CTIEUtils.ResolveLookupRecord(CultureAspect.tableName, aspectLookup:GetName(), aspectLookup:GetID())
+                if aspectGuid then
+                    writeLog(string.format("Adding Culture Aspect [%s]->[%s].", aspectName, aspectLookup:GetName()), STATUS.IMPL)
+                    aspects[aspectName] = aspectGuid
+
+                    -- Process aspect's selected features
+                    local aspectFeatures = aspectDTO:SelectedFeatures()
+                    if aspectFeatures then
+                        local aspectFill = dmhub.GetTable(CultureAspect.tableName)[aspectGuid]:GetClassLevel()
+                        local levelChoices = CTIELevelChoiceImporter:new(aspectFeatures, aspectFill.features)
+                        if next(levelChoices) then
+                            local lc = codexToon:GetLevelChoices()
+                            CTIEUtils.MergeTables(lc, levelChoices)
+                        end
+                    end
                 end
             end
         end
