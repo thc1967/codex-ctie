@@ -64,7 +64,7 @@ function CTIEImporter:Import()
     self.t.name = (CTIEUtils.inDebugMode() and "zzz" or "") .. dto:GetCharacterName()
 
     writeLog(string.format("Character Name is [%s].", self.t.name), STATUS.IMPL)
-    writeLog(string.format("Career Background Name is [%s].", dto:Character():Career():GuidLookup().name))
+    writeLog(string.format("Career Background Name is [%s].", dto:Character():Career():GuidLookup():GetName()))
 
     -- Move values into the Codex token & character objects
     self:_importToken()
@@ -154,13 +154,14 @@ function CTIEImporter:_importCharacter()
     self:_importClass()
     self:_importAttributeBuild()
     self:_importAttributes()
+    self:_importKits()
 
     -- Lookup table values
     writeLog("Simple Lookup import starting.", STATUS.INFO, 1)
     for propName, config in pairs(CTIEConfig.character.lookupRecords) do
         local r = dto:_getProp(propName)
         writeDebug("IMPORTCHARACTER:: SIMPLELOOKUP:: %s -> %s", propName, json(r))
-        if r then
+        if r and (r:try_get("name") or r:try_get("guid")) then
             local guid = CTIEUtils.ResolveLookupRecord(config.tableName, r.name, r.guid)
             if guid then
                 writeLog(string.format("Adding [%s]->[%s].", propName, r.name), STATUS.IMPL)
@@ -412,4 +413,40 @@ function CTIEImporter:_importCulture()
 
     writeLog("Culture complete.", STATUS.INFO, -1)
     writeDebug("IMPORTCULTURE:: COMPLETE:: %s", json(aspects))
+end
+
+--- Imports character kit information.
+--- Resolves kit lookup records and sets kitid and kitid2 properties on the destination character.
+--- @private
+function CTIEImporter:_importKits()
+    writeDebug("IMPORTKITS::")
+    writeLog("Kits starting.", STATUS.INFO, 1)
+
+    local dto, codexToon = self:__getSourceDestCharacterAliases()
+    local kitDTO = dto:Kit()
+
+    -- Import first kit
+    local kit1 = kitDTO:Kit1()
+    if kit1 and (kit1:GetName() or kit1:GetID()) then
+        local resolvedGuid = CTIEUtils.ResolveLookupRecord(Kit.tableName, kit1:GetName(), kit1:GetID())
+        if resolvedGuid then
+            writeLog(string.format("Adding Kit 1 [%s].", kit1:GetName() or kit1:GetID()), STATUS.IMPL)
+            codexToon.kitid = resolvedGuid
+        end
+    end
+
+    -- Import second kit
+    local kit2 = kitDTO:Kit2()
+    if kit2 and (kit2:GetName() or kit2:GetID()) then
+        local resolvedGuid = CTIEUtils.ResolveLookupRecord(Kit.tableName, kit2:GetName(), kit2:GetID())
+        if resolvedGuid then
+            writeLog(string.format("Adding Kit 2 [%s].", kit2:GetName() or kit2:GetID()), STATUS.IMPL)
+            codexToon.kitid2 = resolvedGuid
+        end
+    end
+
+    writeLog("Kits complete.", STATUS.INFO, -1)
+    writeDebug("IMPORTKITS:: COMPLETE:: kitid=%s kitid2=%s", 
+        codexToon:try_get("kitid") or "nil", 
+        codexToon:try_get("kitid2") or "nil")
 end

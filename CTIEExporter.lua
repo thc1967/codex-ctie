@@ -72,7 +72,7 @@ function CTIEExporter:_exportCharacter()
     -- Verbatim transfers
     for propName, config in pairs(CTIEConfig.character.verbatim) do
         if config.export then
-            dto:_setProp(propName, codexToon[propName])
+            dto:_setProp(propName, codexToon:try_get(propName))
         end
     end
 
@@ -94,7 +94,7 @@ function CTIEExporter:_exportCharacter()
     self:_exportCareer()
     self:_exportClass()
     self:_exportCulture()
-    -- TODO: Kits
+    self:_exportKits()
 end
 
 --- Exports character ancestry information including race and racial features.
@@ -383,7 +383,7 @@ function CTIEExporter:_exportCulture()
     end
 
     -- Check for culture language selection
-    local codexCultureLanguage = codexCulture and codexToon.levelChoices and codexToon.levelChoices.cultureLanguageChoice or ""
+    local codexCultureLanguage = codexCulture and codexToon.levelChoices and codexToon.levelChoices.cultureLanguageChoice
     if codexCultureLanguage and #codexCultureLanguage and #codexCultureLanguage[1] then
         local dtoLanguage = dto:Culture():Language()
         if dtoLanguage then
@@ -467,4 +467,32 @@ function CTIEExporter:_populateSelectedFeatures(features, targetSelectedFeatures
 
         targetSelectedFeatures:AddFeature(selectedFeature)
     end
+end
+
+--- Exports character kit information.
+--- Processes up to two character kits from kitid and kitid2 properties,
+--- creating lookup records for kit identification during import operations.
+--- @private
+function CTIEExporter:_exportKits()
+    writeDebug("EXPORTKITS::")
+    local codexToon, dto = self:__getSourceDestCharacterAliases()
+    local kitDTO = dto:Kit()
+
+    -- Export first kit
+    local kitid = codexToon:try_get("kitid")
+    if kitid and CTIEUtils.StringIsGuid(kitid) then
+        local name = CTIEUtils.GetRecordName(Kit.tableName, kitid) or ""
+        writeDebug("EXPORTKITS:: KIT1:: %s [%s]", kitid, name)
+        kitDTO:Kit1():SetTableName(Kit.tableName):SetID(kitid):SetName(name)
+    end
+
+    -- Export second kit
+    local kitid2 = codexToon:try_get("kitid2")
+    if kitid2 and CTIEUtils.StringIsGuid(kitid2) then
+        local name = CTIEUtils.GetRecordName(Kit.tableName, kitid2) or ""
+        writeDebug("EXPORTKITS:: KIT2:: %s [%s]", kitid2, name)
+        kitDTO:Kit2():SetTableName(Kit.tableName):SetID(kitid2):SetName(name)
+    end
+
+    writeDebug("EXPORTKITS:: COMPLETE:: %s", json(kitDTO))
 end
