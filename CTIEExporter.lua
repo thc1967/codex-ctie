@@ -133,11 +133,29 @@ function CTIEExporter:_exportAttributes()
     local sourceAttributes = codexToon.attributes or {}
     local attributesDTO = dto:Attributes()
 
-    for _, attributeKey in ipairs(CTIEConfig.attributes) do
-        local sourceAttr = sourceAttributes[attributeKey]
-        if sourceAttr and sourceAttr.baseValue then
-            attributesDTO:SetAttribute(attributeKey, sourceAttr.baseValue)
-        end
+    local sourceAttr = sourceAttributes["mgt"]
+    if sourceAttr and sourceAttr.baseValue then
+        attributesDTO:SetMgt(sourceAttr.baseValue)
+    end
+    
+    sourceAttr = sourceAttributes["agl"]
+    if sourceAttr and sourceAttr.baseValue then
+        attributesDTO:SetAgl(sourceAttr.baseValue)
+    end
+    
+    sourceAttr = sourceAttributes["rea"]
+    if sourceAttr and sourceAttr.baseValue then
+        attributesDTO:SetRea(sourceAttr.baseValue)
+    end
+    
+    sourceAttr = sourceAttributes["inu"]
+    if sourceAttr and sourceAttr.baseValue then
+        attributesDTO:SetInu(sourceAttr.baseValue)
+    end
+    
+    sourceAttr = sourceAttributes["prs"]
+    if sourceAttr and sourceAttr.baseValue then
+        attributesDTO:SetPrs(sourceAttr.baseValue)
     end
 end
 
@@ -279,7 +297,7 @@ function CTIEExporter:_exportFeatures(features)
 
                     if #domainSelections > 0 then
                         result[domainGuid] = {
-                            choiceType = "CharacterDeityDomainChoice", -- or whatever the actual type name is
+                            choiceType = "CharacterDeityDomainChoice",
                             source = feature:try_get("source") or "",
                             selections = domainSelections
                         }

@@ -1,5 +1,7 @@
 local writeDebug = CTIEUtils.writeDebug
+local writeLog = CTIEUtils.writeLog
 local fileLogger = CTIEUtils.FileLogger
+local STATUS = CTIEUtils.STATUS
 
 --- Imports selected features back into levelChoices format for Codex character data.
 --- Matches selected features against available feature definitions and resolves GUIDs.
@@ -159,6 +161,7 @@ function CTIELevelChoiceImporter:_addToLevelChoices(featureGuid, selectedFeature
         writeDebug("LEVELCHOICEIMPORTER::ADDTOLEVELCHOICES:: %s", selection:GetName())
         local resolvedGuid = self:_resolveSelectionGuid(selection, matchedFeature)
         if resolvedGuid then
+            writeLog(string.format("Adding [%s] -> [%s].", selection:GetTableName(), selection:GetName()), STATUS.IMPL)
             table.insert(selectionGuids, resolvedGuid)
         end
     end

@@ -5,6 +5,9 @@ local STATUS = CTIEUtils.STATUS
 --- Data Transfer Object for lookup table records.
 --- Stores GUID, name, and table name for later record resolution.
 --- @class CTIELookupTableDTO
+--- @field tableName string The name of the table containing the record
+--- @field guid string The GUID of the record  
+--- @field name string The display name of the record
 CTIELookupTableDTO = RegisterGameType("CTIELookupTableDTO", "CTIEBaseDTO")
 CTIELookupTableDTO.__index = CTIELookupTableDTO
 

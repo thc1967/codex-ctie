@@ -261,10 +261,24 @@ function CTIEImporter:_importAttributes()
     local sourceAttributes = dto:Attributes()
     local destinationAttributes = codexToon:get_or_add("attributes", {})
 
-    for _, attr in ipairs(CTIEConfig.attributes) do
-        if sourceAttributes:GetAttribute(attr) then
-            destinationAttributes[attr].baseValue = sourceAttributes:GetAttribute(attr)
-        end
+    if sourceAttributes:GetMgt() then
+        destinationAttributes["mgt"].baseValue = sourceAttributes:GetMgt()
+    end
+    
+    if sourceAttributes:GetAgl() then
+        destinationAttributes["agl"].baseValue = sourceAttributes:GetAgl()
+    end
+    
+    if sourceAttributes:GetRea() then
+        destinationAttributes["rea"].baseValue = sourceAttributes:GetRea()
+    end
+    
+    if sourceAttributes:GetInu() then
+        destinationAttributes["inu"].baseValue = sourceAttributes:GetInu()
+    end
+    
+    if sourceAttributes:GetPrs() then
+        destinationAttributes["prs"].baseValue = sourceAttributes:GetPrs()
     end
 
     writeLog(string.format("Setting Attributes [%s].", CTIEUtils.SummarizeAttributes(codexToon.attributes)), STATUS.IMPL)
