@@ -1,5 +1,4 @@
 local writeDebug = CTIEUtils.writeDebug
-local writeLog = CTIEUtils.writeLog
 local STATUS = CTIEUtils.STATUS
 
 --- Sends a status message to the user via chat with optional color formatting.
@@ -56,36 +55,6 @@ function CTIEExport(token)
     end
 end
 
-function CTIEExport2(token)
-    local targetToken = token or dmhub.currentToken
-
-    if not targetToken then
-        statusToChat("No token selected.", STATUS.WARN)
-        return
-    end
-
-    local exporter = CTIEExporter:new(targetToken)
-    if not exporter then
-        statusToChat("Selected token is not a hero.", STATUS.WARN)
-        return
-    end
-
-    local characterData = exporter:Export()
-    local jsonString = characterData:ToJSON()
-
-    local writePath = "characters/" .. dmhub.gameid
-    local exportFilename = string.format("%s_%s.json", characterData:GetCharacterName(), os.date("%Y%m%d%H%M%S"))
-    if CTIEUtils.inDebugMode() then exportFilename = string.format("%s.json", characterData:GetCharacterName()) end
-    local fullPath = dmhub.WriteTextFile(writePath, exportFilename, jsonString)
-
-    if fullPath and #fullPath then
-        statusToChat(string.format("Exported token as %s.", fullPath), STATUS.IMPL)
-        writeDebug("Exported token as %s", fullPath)
-    else
-        statusToChat("Export failed.", STATUS.ERROR)
-    end
-end
-
 --- Handles CTIE chat commands including flag toggles and character export.
 --- Use "d" to toggle debug logging and "v" to toggle verbose logging.
 --- Use "export" to export the currently selected character token to JSON.
@@ -93,7 +62,7 @@ end
 Commands.ctie = function(args)
     -- Handle export command
     if args and string.lower(args):match("^%s*export%s*$") then
-        CTIEExport2()
+        CTIEExport()
         return
     end
 

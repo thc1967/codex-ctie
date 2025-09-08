@@ -1,10 +1,6 @@
 --- Current CTIE file format version for metadata and compatibility checking.
 local CTIE_VERSION = 1
 
-local writeDebug = CTIEUtils.writeDebug
-local writeLog = CTIEUtils.writeLog
-local STATUS = CTIEUtils.STATUS
-
 --- Data Transfer Object for character export/import metadata.
 --- Contains version information, timestamps, and export source details.
 --- @class CTIEMetadataDTO

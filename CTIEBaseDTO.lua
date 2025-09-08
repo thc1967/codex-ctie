@@ -1,10 +1,10 @@
-local writeDebug = CTIEUtils.writeDebug
-
 --- Base class for all Data Transfer Objects.
 --- @class CTIEBaseDTO
 --- @property typeName string The name of the class of this object
 CTIEBaseDTO = RegisterGameType("CTIEBaseDTO")
 CTIEBaseDTO.__index = CTIEBaseDTO
+
+local writeDebug = CTIEUtils.writeDebug
 
 --- Creates a new Base DTO instance.
 --- @return CTIEBaseDTO instance The new DTO instance
@@ -18,7 +18,7 @@ end
 --- @param value any The value to store
 --- @return CTIEBaseDTO self Returns self for method chaining
 function CTIEBaseDTO:_setProp(propName, value)
-    writeDebug("SETDATA:: TYPE:: %s property:: %s", self.typeName, propName)
+    writeDebug("BASEDTO:: SETPROP:: TYPE:: %s property:: %s", self.typeName, propName)
     self[propName] = value
     return self
 end
@@ -34,12 +34,12 @@ end
 --- @param data table The table data with typeName propertys
 --- @return CTIEBaseDTO|table|nil instance The populated DTO instance or raw data
 function CTIEBaseDTO:_fromTable(data)
-    writeDebug("FROMTABLE:: START:: SELF:: %s", json(self))
+    writeDebug("BASEDTO:: FROMTABLE:: START:: SELF:: %s", json(self))
 
     for propName, _ in pairs(self) do
         self:_setProp(propName, data[propName] or self[propName])
     end
 
-    writeDebug("FROMTABLE:: %s", json(self))
+    writeDebug("BASEDTO:: FROMTABLE:: %s", json(self))
     return self
 end

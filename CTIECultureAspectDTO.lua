@@ -1,7 +1,3 @@
-local writeDebug = CTIEUtils.writeDebug
-local writeLog = CTIEUtils.writeLog
-local STATUS = CTIEUtils.STATUS
-
 --- Data Transfer Object for individual culture aspect information.
 --- Handles aspect-related character data and features.
 --- @class CTIECultureAspectDTO

@@ -1,7 +1,3 @@
-local writeDebug = CTIEUtils.writeDebug
-local writeLog = CTIEUtils.writeLog
-local STATUS = CTIEUtils.STATUS
-
 --- Data Transfer Object for lookup table records.
 --- Stores GUID, name, and table name for later record resolution.
 --- @class CTIELookupTableDTO

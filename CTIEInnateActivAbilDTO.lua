@@ -1,7 +1,3 @@
-local writeDebug = CTIEUtils.writeDebug
-local writeLog = CTIEUtils.writeLog
-local STATUS = CTIEUtils.STATUS
-
 --- Data Transfer Object for character innate activated abilities.
 --- Manages supernatural or special abilities that can be actively triggered.
 --- @class CTIEInnateActivatedAbilitiesDTO

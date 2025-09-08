@@ -1,7 +1,3 @@
-local writeDebug = CTIEUtils.writeDebug
-local writeLog = CTIEUtils.writeLog
-local STATUS = CTIEUtils.STATUS
-
 --- Data Transfer Object for character career information.
 --- Contains profession, background, and career-specific data.
 --- @class CTIECareerDTO

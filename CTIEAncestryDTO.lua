@@ -1,7 +1,3 @@
-local writeDebug = CTIEUtils.writeDebug
-local writeLog = CTIEUtils.writeLog
-local STATUS = CTIEUtils.STATUS
-
 --- Data Transfer Object for character ancestry information.
 --- Handles ancestry-related character data and features.
 --- @class CTIEAncestryDTO

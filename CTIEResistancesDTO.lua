@@ -1,7 +1,3 @@
-local writeDebug = CTIEUtils.writeDebug
-local writeLog = CTIEUtils.writeLog
-local STATUS = CTIEUtils.STATUS
-
 --- Data Transfer Object for character damage resistances and immunities.
 --- Manages resistance to various damage types and environmental effects.
 --- @class CTIEResistancesDTO

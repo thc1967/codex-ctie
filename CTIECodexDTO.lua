@@ -1,13 +1,11 @@
-local writeDebug = CTIEUtils.writeDebug
-local writeLog = CTIEUtils.writeLog
-local STATUS = CTIEUtils.STATUS
-
 --- Root Data Transfer Object for complete Codex character export/import operations.
 --- Aggregates metadata, token, and character data into a single exportable structure.
 --- @class CTIECodexDTO
 --- @field data table The data this object manages
 CTIECodexDTO = RegisterGameType("CTIECodexDTO", "CTIEBaseDTO")
 CTIECodexDTO.__index = CTIECodexDTO
+
+local writeDebug = CTIEUtils.writeDebug
 
 --- Creates a new Codex DTO instance with all component DTOs initialized.
 --- @return CTIEBaseDTO|CTIECodexDTO instance The new Codex DTO instance

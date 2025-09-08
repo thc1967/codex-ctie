@@ -1,7 +1,3 @@
-local writeDebug = CTIEUtils.writeDebug
-local writeLog = CTIEUtils.writeLog
-local STATUS = CTIEUtils.STATUS
-
 --- Data Transfer Object for character class information.
 --- Contains class levels, features, and class-specific progression data.
 --- @class CTIEClassDTO

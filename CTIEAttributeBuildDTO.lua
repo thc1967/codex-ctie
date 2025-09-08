@@ -1,7 +1,3 @@
-local writeDebug = CTIEUtils.writeDebug
-local writeLog = CTIEUtils.writeLog
-local STATUS = CTIEUtils.STATUS
-
 --- Data Transfer Object for character attribute build configuration.
 --- Manages how character attributes are constructed and allocated.
 --- @class CTIEAttributeBuildDTO

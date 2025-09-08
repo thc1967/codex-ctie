@@ -1,7 +1,3 @@
-local writeDebug = CTIEUtils.writeDebug
-local writeLog = CTIEUtils.writeLog
-local STATUS = CTIEUtils.STATUS
-
 --- Container DTO for managing multiple selected features as an array.
 --- @class CTIESelectedFeaturesDTO
 CTIESelectedFeaturesDTO = RegisterGameType("CTIESelectedFeaturesDTO", "CTIEBaseDTO")

@@ -1,7 +1,3 @@
-local writeDebug = CTIEUtils.writeDebug
-local writeLog = CTIEUtils.writeLog
-local STATUS = CTIEUtils.STATUS
-
 --- Data Transfer Object for character features and abilities.
 --- Manages special features, traits, and abilities granted to the character.
 --- @class CTIECharacterFeaturesDTO

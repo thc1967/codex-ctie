@@ -1,7 +1,3 @@
-local writeDebug = CTIEUtils.writeDebug
-local writeLog = CTIEUtils.writeLog
-local STATUS = CTIEUtils.STATUS
-
 --- Data Transfer Object for complete character mechanical data.
 --- Aggregates all character systems including ancestry, classes, attributes, and features.
 --- @class CTIECharacterDTO
@@ -25,15 +21,11 @@ CTIECharacterDTO.__index = CTIECharacterDTO
 function CTIECharacterDTO:new()
     local instance = setmetatable(CTIEBaseDTO:new(), self)
     instance:_setProp("ancestry", CTIEAncestryDTO:new())
-    -- instance:_setProp("attributeBuild", CTIEAttributeBuildDTO:new())
     instance:_setProp("attributes", CTIEAttributesDTO:new())
     instance:_setProp("career", CTIECareerDTO:new())
-    -- instance:_setProp("characterFeatures", CTIECharacterFeaturesDTO:new())
     instance:_setProp("class", CTIEClassDTO:new())
     instance:_setProp("culture", CTIECultureDTO:new())
-    -- instance:_setProp("innateActivatedAbilities", CTIEInnateActivatedAbilitiesDTO:new())
     instance:_setProp("kit", CTIEKitDTO:new())
-    -- instance:_setProp("resistances", CTIEResistancesDTO:new())
     instance:_setProp("characterType", CTIELookupTableDTO:new())
     instance:_setProp("complication", CTIELookupTableDTO:new())
     return instance

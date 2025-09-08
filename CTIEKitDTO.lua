@@ -1,7 +1,3 @@
-local writeDebug = CTIEUtils.writeDebug
-local writeLog = CTIEUtils.writeLog
-local STATUS = CTIEUtils.STATUS
-
 --- Data Transfer Object for character kit identifiers.
 --- Stores equipment packages and starting gear selections.
 --- @class CTIEKitDTO
