@@ -18,16 +18,11 @@
 CTIEUtils = RegisterGameType("CTIEUtils")
 CTIEUtils.__index = CTIEUtils
 
-local CTIE_DEBUG = true
-local CTIE_VERBOSE = true
+local CTIE_DEBUG = false
+local CTIE_VERBOSE = false
 
 --- Static storage for file logger instances, keyed by fileName
 CTIEUtils._fileLoggers = {}
-
-local TABLE_NAME_CHOICE_TYPE_MAP = {
-    [Language.tableName] = "CharacterLanguageChoice",
-    [Skill.tableName] = "CharacterSkillChoice",
-}
 
 --- Marker used in lookup records to identify features that exist in option lists rather than database tables
 CTIEUtils.FEATURE_TABLE_MARKER = "::FEATURE::"
@@ -186,15 +181,6 @@ function CTIEUtils.TableLookupFromName(tableName, name)
     return nil, nil
 end
 
---- Checks if a given ID exists in the specified game table.
---- @param tableName string The name of the Codex game table to check
---- @param id string The ID to look for in the table
---- @return boolean exists True if the ID exists in the table, false otherwise
-function CTIEUtils.TableIdExists(tableName, id)
-    local t = dmhub.GetTable(tableName)
-    return t and t[id] ~= nil
-end
-
 --- Validates whether a string matches the standard GUID format.
 --- Checks for the pattern: 8-4-4-4-12 hexadecimal characters with hyphens.
 --- @param str string|nil The string to validate (nil or empty returns false)
@@ -219,79 +205,6 @@ function CTIEUtils.CreateLookupRecord(tableName, guid, name)
         guid = guid or "",
         name = name or ""
     }
-end
-
---- Creates a feature record for features that exist in option lists rather than database tables.
---- Searches through the provided options list to find a feature matching the given GUID
---- and creates a lookup record with the special feature table name marker.
---- @param optionsList table The list of available feature options to search
---- @param guid string The GUID of the feature to create a record for
---- @return table record The feature lookup record with feature as table name
-function CTIEUtils.MakeFeatureRecord(optionsList, guid)
-    CTIEUtils.writeDebug("MAKEFEATURERECORD:: GUID:: %s", guid)
-
-    if not optionsList or not guid then
-        return CTIEUtils.CreateLookupRecord(CTIEUtils.FEATURE_TABLE_MARKER, guid, "")
-    end
-
-    -- Search through the feature list for the matching guid
-    local name = ""
-    for _, feature in pairs(optionsList) do
-        CTIEUtils.writeDebug("MAKEFEATURERECORD:: %s %s", feature.guid, feature.name)
-        if feature.guid == guid then
-            name = feature.name or ""
-            break
-        end
-    end
-
-    CTIEUtils.writeDebug("MAKEFEATURERECORD:: DONE:: %s", name)
-    return CTIEUtils.CreateLookupRecord(CTIEUtils.FEATURE_TABLE_MARKER, guid, name)
-end
-
---- Resolves a feature record back to a valid feature GUID using the provided feature structure.
---- Searches through feature choices and their options to match either by GUID or name,
---- handling the special case of features that exist in option lists rather than database tables.
---- @param featureStructure table The available feature structure containing feature choices and options
---- @param featureRecord table The feature record containing guid and name to resolve
---- @return string guid The resolved feature GUID, or the original GUID if no match found
-function CTIEUtils.ResolveFeatureRecord(featureStructure, featureRecord)
-    CTIEUtils.writeDebug("RESOLVEFEATURERECORD:: %s", featureRecord and featureRecord.guid or "nil")
-
-    if not featureRecord or not featureRecord.guid then
-        return ""
-    end
-
-    if not featureStructure then
-        return featureRecord.guid
-    end
-
-    -- Helper function to check a single feature
-    local function checkFeature(feature, targetGuid, targetName)
-        if feature.guid == targetGuid then
-            return feature.guid
-        end
-        if targetName and #targetName > 0 and feature.name == targetName then
-            return feature.guid
-        end
-        return nil
-    end
-
-    -- Search through the main feature structure
-    for _, item in pairs(featureStructure) do
-        if item.typeName == "CharacterFeatureChoice" and item.options then
-            for _, option in pairs(item.options) do
-                local result = checkFeature(option, featureRecord.guid, featureRecord.name)
-                if result then
-                    CTIEUtils.writeDebug("RESOLVEFEATURERECORD:: Found in feature choice: %s", option.name)
-                    return result
-                end
-            end
-        end
-    end
-
-    -- Return original GUID as fallback
-    CTIEUtils.writeDebug("RESOLVEFEATURERECORD:: No match found, returning original GUID")
-    return featureRecord.guid
 end
 
 --- Retrieves the display name for a record from a table using its GUID.
@@ -369,13 +282,6 @@ function CTIEUtils.ChoiceTypeToTableName(choiceType)
     return CHOICE_TYPE_TO_TABLE_NAME_MAP[choiceType] or ""
 end
 
---- Maps table names to choice types via TABLE_NAME_CHOICE_TYPE_MAP lookup.
---- @param tableName string The table name to map
---- @return string choiceType The choice type or empty string if not found
-function CTIEUtils.TableNameToChoiceType(tableName)
-    return TABLE_NAME_CHOICE_TYPE_MAP[tableName] or ""
-end
-
 --- Merges all key-value pairs from source table into target table.
 --- Overwrites any existing keys in the target table with values from the source table.
 --- Modifies the target table in place and returns it for convenience.
@@ -403,17 +309,6 @@ function CTIEUtils.AppendList(target, source)
     table.move(source, 1, #source, #target + 1, target)
 
     return target
-end
-
---- Appends a value to a table at the specified key, creating the key's table if needed.
---- @param t table The target table to modify
---- @param k any The key where the value should be appended
---- @param v any The value to append
---- @return table The modified table
-function CTIEUtils.AppendTable(t, k, v)
-    t[k] = t[k] or {}
-    table.insert(t[k], v)
-    return t
 end
 
 --- Gets or creates a file logger instance for the specified fileName.

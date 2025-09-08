@@ -64,7 +64,6 @@ function CTIEImporter:Import()
     self.t.name = (CTIEUtils.inDebugMode() and "zzz" or "") .. dto:GetCharacterName()
 
     writeLog(string.format("Character Name is [%s].", self.t.name), STATUS.IMPL)
-    writeLog(string.format("Career Background Name is [%s].", dto:Character():Career():GuidLookup():GetName()))
 
     -- Move values into the Codex token & character objects
     self:_importToken()
@@ -245,9 +244,7 @@ function CTIEImporter:_importAttributeBuild()
     local sab = dto:AttributeBuild()
     local dab = codexToon:get_or_add("attributeBuild", {})
 
-    for k, v in pairs(sab) do
-        dab[k] = v
-    end
+    CTIEUtils.MergeTables(dab, sab)
 
     writeDebug("IMPORTATTRIBUTEBUILD:: %s", json(codexToon.attributeBuild))
 end

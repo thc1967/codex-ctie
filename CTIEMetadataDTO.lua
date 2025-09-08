@@ -1,5 +1,5 @@
 --- Current CTIE file format version for metadata and compatibility checking.
-local CTIE_VERSION = 1
+local CTIE_VERSION = 2
 
 --- Data Transfer Object for character export/import metadata.
 --- Contains version information, timestamps, and export source details.

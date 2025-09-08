@@ -80,12 +80,13 @@ import.Register {
     input = "plaintext",
     priority = 1200,
     text = function(_, text)
-        local dto = CTIECodexDTO:new()
-        if dto:FromJSON(text) then
-            CTIEUtils.FileLogger("import"):Log("IMPORT:: START::")
-            local importer = CTIEImporter:new(dto)
-            importer:Import()
-            CTIEUtils.FileLogger("import"):Log("IMPORT:: COMPLETE::")
+        local dto, errorMessage = CTIECodexDTO:new():FromJSON(text)
+        if not dto then
+            CTIEUtils.writeLog(errorMessage or "Import failed: Unknown error", STATUS.ERROR)
+            return
         end
+
+        local importer = CTIEImporter:new(dto)
+        importer:Import()
     end
 }

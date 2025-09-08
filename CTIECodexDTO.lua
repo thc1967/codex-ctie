@@ -45,23 +45,42 @@ function CTIECodexDTO:ToJSON()
     return json(self)
 end
 
+
 --- Converts JSON string to DTO instance using embedded type names.
+--- Validates file format and version compatibility before attempting to populate DTO.
 --- @param jsonText string The JSON data to deserialize
 --- @return CTIECodexDTO|nil instance The populated DTO instance or nil if failed
+--- @return string|nil errorMessage Specific error message if parsing/validation failed
 function CTIECodexDTO:FromJSON(jsonText)
     writeDebug("FROMJSON:: %d\n%s", jsonText and #jsonText or 0, jsonText)
-    if not jsonText then
-        writeDebug("FROMJSON:: !!EMPTYFILE")
-        return nil
+
+    if not jsonText or #jsonText == 0 then
+        return nil, "Import file is empty"
     end
 
-    local data = dmhub.FromJson(jsonText).result
-    if not data then
-        writeDebug("FROMJSON:: !!INVALIDFORMAT")
-        return nil
+    local parseResult = dmhub.FromJson(jsonText)
+    if not parseResult or not parseResult.result then
+        return nil, "Import file contains invalid JSON"
     end
 
-    return self:_fromTable(data)
+    local data = parseResult.result
+
+    -- Validate metadata and version
+    if not data.metadata then
+        return nil, "Import file is missing metadata (legacy format not supported)"
+    end
+
+    if not data.metadata.version or type(data.metadata.version) ~= "number" then
+        return nil, "Import file has invalid or missing version information"
+    end
+
+    if data.metadata.version < 2 then
+        return nil, string.format("Import file version %d is not supported (requires version 2 or higher)", data.metadata.version)
+    end
+
+    -- Validation passed, populate the DTO
+    local instance = self:_fromTable(data)
+    return instance, nil
 end
 
 --------------------------------------------------------------------------------------------------
